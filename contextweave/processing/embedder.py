@@ -32,17 +32,15 @@ class GeminiEmbedder:
         result = client.embed_content(
             model=self._model,
             content=text,
-            task_type="retrieval_document",
         )
         return result["embedding"]
 
     def embed_query(self, query: str) -> list[float]:
-        """Embed a query string (uses retrieval_query task type)."""
+        """Embed a query string."""
         client = self._get_client()
         result = client.embed_content(
             model=self._model,
             content=query,
-            task_type="retrieval_query",
         )
         return result["embedding"]
 
@@ -59,7 +57,6 @@ class GeminiEmbedder:
                 result = client.embed_content(
                     model=self._model,
                     content=texts,
-                    task_type="retrieval_document",
                 )
                 embeddings = result["embedding"]
 

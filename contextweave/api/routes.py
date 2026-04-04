@@ -373,7 +373,6 @@ async def debug_gemini():
             result = genai.embed_content(
                 model=cfg.embedding_model,
                 content="test",
-                task_type="retrieval_document",
             )
             embed_ok = len(result["embedding"]) > 0
         except Exception as e:

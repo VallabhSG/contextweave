@@ -9,9 +9,9 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     gemini_api_key: str = ""
-    embedding_model: str = "models/text-embedding-004"
-    reasoning_model: str = "models/gemini-2.0-flash"
-    extraction_model: str = "models/gemini-2.0-flash"
+    embedding_model: str = "models/embedding-001"
+    reasoning_model: str = "models/gemini-1.5-flash"
+    extraction_model: str = "models/gemini-1.5-flash"
 
     chroma_persist_dir: str = "./chroma_data"
     sqlite_db_path: str = "./contextweave.db"
