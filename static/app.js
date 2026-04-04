@@ -53,7 +53,7 @@
   }
 
   // ── HEALTH ───────────────────────────────────────────────────
-  const statKeys = ['events', 'chunks', 'memories', 'vectors', 'entities', 'edges'];
+  const statKeys = ['events', 'memories', 'entities', 'vectors'];
 
   function animateCount(el, target) {
     const start = parseInt(el.textContent) || 0;
@@ -72,16 +72,16 @@
     try {
       const h = await api.get('/api/health');
       statKeys.forEach(k => {
-        const el = document.querySelector(`#stat-${k} .stat-num`);
+        const el = document.getElementById(`stat-${k}`);
         if (el) animateCount(el, h[k] ?? 0);
       });
-      const dot = document.querySelector('.live-dot');
+      const dot = document.getElementById('live-dot');
       const lbl = document.getElementById('live-label');
       dot.className = 'live-dot online';
       lbl.textContent = 'live';
       return h;
     } catch {
-      const dot = document.querySelector('.live-dot');
+      const dot = document.getElementById('live-dot');
       const lbl = document.getElementById('live-label');
       dot.className = 'live-dot error';
       lbl.textContent = 'unreachable';
@@ -368,9 +368,17 @@
   }
 
   // ── INIT ─────────────────────────────────────────────────────
+  function setupNav() {
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 40);
+    }, { passive: true });
+  }
+
   async function init() {
     setupFadeIn();
     setupDrop();
+    setupNav();
 
     document.getElementById('btn-ingest-text').addEventListener('click', ingestText);
     document.getElementById('btn-ingest-file').addEventListener('click', ingestFile);

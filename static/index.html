@@ -7,90 +7,107 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <div class="noise"></div>
-  <div class="glow-bg"></div>
+
+  <!-- NAV -->
+  <nav class="nav" id="nav">
+    <span class="nav-logo">ContextWeave</span>
+    <div class="nav-links">
+      <a href="#section-ingest">Ingest</a>
+      <a href="#section-query">Query</a>
+      <a href="#section-memories">Memory</a>
+      <a href="/docs" target="_blank">API</a>
+    </div>
+  </nav>
 
   <!-- HERO -->
-  <section class="hero" id="top">
-    <div class="hero-inner">
-      <div class="wordmark">ContextWeave</div>
-      <p class="hero-tag">Personal long-term memory &amp; context engine</p>
-      <p class="hero-sub">Built to demonstrate the core challenge behind <span class="accent">Thine</span> — structuring, scoring, and reasoning across a lifetime of context.</p>
-      <div class="pulse-strip" id="pulse-strip">
-        <div class="stat-card" id="stat-events"><span class="stat-num">—</span><span class="stat-label">events</span></div>
-        <div class="stat-card" id="stat-chunks"><span class="stat-num">—</span><span class="stat-label">chunks</span></div>
-        <div class="stat-card" id="stat-memories"><span class="stat-num">—</span><span class="stat-label">memories</span></div>
-        <div class="stat-card" id="stat-vectors"><span class="stat-num">—</span><span class="stat-label">vectors</span></div>
-        <div class="stat-card" id="stat-entities"><span class="stat-num">—</span><span class="stat-label">entities</span></div>
-        <div class="stat-card" id="stat-edges"><span class="stat-num">—</span><span class="stat-label">edges</span></div>
-      </div>
-      <div class="live-dot-row"><span class="live-dot"></span><span class="live-label" id="live-label">connecting…</span></div>
+  <section class="hero">
+    <p class="hero-eyebrow">Personal memory engine</p>
+    <h1 class="hero-headline">
+      Your context,<br><em>finally connected.</em>
+    </h1>
+    <p class="hero-sub">
+      Ingests conversations, notes, and calendar events. Scores them with temporal decay. Surfaces what matters through hybrid retrieval and Gemini reasoning.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><span class="hero-stat-num" id="stat-events">—</span><span class="hero-stat-label">Events</span></div>
+      <div class="hero-stat"><span class="hero-stat-num" id="stat-memories">—</span><span class="hero-stat-label">Memories</span></div>
+      <div class="hero-stat"><span class="hero-stat-num" id="stat-entities">—</span><span class="hero-stat-label">Entities</span></div>
+      <div class="hero-stat"><span class="hero-stat-num" id="stat-vectors">—</span><span class="hero-stat-label">Vectors</span></div>
+    </div>
+    <div class="live-row">
+      <span class="live-dot" id="live-dot"></span>
+      <span class="live-label" id="live-label">connecting…</span>
     </div>
   </section>
 
+  <hr class="divider" />
+
   <!-- INGEST -->
   <section class="section fade-in" id="section-ingest">
-    <div class="section-header">
-      <div class="section-num">01</div>
-      <div>
-        <h2>Feed the Memory</h2>
-        <p class="section-desc">Paste text or upload a file. ContextWeave chunks it, embeds it, extracts entities, and stores it with temporal importance scoring.</p>
-      </div>
-    </div>
-    <div class="card-row">
-      <div class="glass-card">
-        <h3>Text Input</h3>
+    <p class="section-label"><span class="section-num">01</span> Ingestion</p>
+    <h2 class="section-title">Feed the memory.</h2>
+    <p class="section-desc">
+      Paste any text or upload a file. ContextWeave chunks it semantically, embeds it with <code>text-embedding-004</code>, extracts entities via Gemini NER, and stores it with an importance score.
+    </p>
+
+    <div class="card-grid">
+      <div class="card">
+        <p class="card-label">Text input</p>
         <select id="source-select" class="select">
-          <option value="">Source: auto-detect</option>
+          <option value="">Auto-detect source</option>
           <option value="note">Note</option>
           <option value="conversation">Conversation</option>
           <option value="journal">Journal</option>
         </select>
-        <textarea id="ingest-text" class="textarea" placeholder="Paste a journal entry, meeting notes, conversation, or any text…" rows="6"></textarea>
-        <button class="btn btn-primary" id="btn-ingest-text">Ingest Text</button>
+        <textarea id="ingest-text" class="textarea" placeholder="Paste meeting notes, a journal entry, a conversation, or any text…" rows="6"></textarea>
+        <button class="btn btn-primary" id="btn-ingest-text">Ingest text</button>
       </div>
-      <div class="glass-card">
-        <h3>File Upload</h3>
+
+      <div class="card">
+        <p class="card-label">File upload</p>
         <div class="drop-zone" id="drop-zone">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-          <p>Drop a file or <span class="accent-link">click to browse</span></p>
-          <p class="muted">.txt · .md · .ics · .json</p>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          <p>Drop a file or <span class="accent-link">browse</span></p>
+          <p class="hint">.txt · .md · .ics · .json</p>
           <input type="file" id="file-input" accept=".txt,.md,.ics,.json" style="display:none" />
         </div>
         <div id="file-name" class="file-name-display"></div>
-        <button class="btn btn-primary" id="btn-ingest-file" disabled>Upload File</button>
+        <button class="btn btn-primary" id="btn-ingest-file" disabled>Upload file</button>
       </div>
     </div>
+
     <div class="pipeline-viz" id="pipeline-viz">
-      <div class="pipe-step" id="pipe-chunk">Chunk</div>
-      <div class="pipe-arrow">→</div>
-      <div class="pipe-step" id="pipe-embed">Embed</div>
-      <div class="pipe-arrow">→</div>
-      <div class="pipe-step" id="pipe-entity">Extract</div>
-      <div class="pipe-arrow">→</div>
-      <div class="pipe-step" id="pipe-store">Store</div>
+      <div class="pipe-step" id="pipe-chunk">chunk</div>
+      <span class="pipe-arrow">→</span>
+      <div class="pipe-step" id="pipe-embed">embed</div>
+      <span class="pipe-arrow">→</span>
+      <div class="pipe-step" id="pipe-entity">extract entities</div>
+      <span class="pipe-arrow">→</span>
+      <div class="pipe-step" id="pipe-store">store</div>
     </div>
-    <div class="sample-bar" id="sample-bar">
-      <span class="muted">Try a sample:</span>
+
+    <div class="sample-bar">
+      <span class="muted" style="font-size:0.8rem">Try a sample —</span>
       <button class="btn-ghost" data-sample="meeting">Meeting notes</button>
       <button class="btn-ghost" data-sample="journal">Journal entry</button>
       <button class="btn-ghost" data-sample="learning">Learning goals</button>
     </div>
   </section>
 
+  <hr class="divider" />
+
   <!-- QUERY -->
   <section class="section fade-in" id="section-query">
-    <div class="section-header">
-      <div class="section-num">02</div>
-      <div>
-        <h2>Ask Your Memory</h2>
-        <p class="section-desc">Hybrid retrieval — 50% vector similarity + 30% full-text search + 20% knowledge graph — fused with temporal decay scoring, then reasoned over by Gemini.</p>
-      </div>
-    </div>
+    <p class="section-label"><span class="section-num">02</span> Retrieval & Reasoning</p>
+    <h2 class="section-title">Ask your memory<em>.</em></h2>
+    <p class="section-desc">
+      Hybrid retrieval fuses vector similarity (50%), full-text search (30%), and knowledge graph traversal (20%), re-ranked by temporal decay. Gemini reasons over the top results.
+    </p>
+
     <div class="query-bar">
       <input type="text" id="query-input" class="query-input" placeholder="What have I been focused on this week?" />
       <button class="btn btn-primary" id="btn-query">Ask</button>
@@ -99,13 +116,15 @@
       <button class="btn-ghost" data-query="What patterns do you see in what I've ingested?">Patterns</button>
       <button class="btn-ghost" data-query="What are my key priorities right now?">Priorities</button>
       <button class="btn-ghost" data-query="What decisions have I made recently?">Decisions</button>
+      <button class="btn-ghost" data-query="What am I avoiding or missing?">Gaps</button>
     </div>
-    <div class="response-card glass-card hidden" id="response-card">
+
+    <div class="card response-card hidden" id="response-card">
       <div class="response-meta">
-        <span class="badge" id="query-type-badge"></span>
-        <span class="badge badge-secondary" id="cited-badge"></span>
+        <span class="badge badge-accent" id="query-type-badge"></span>
+        <span class="badge" id="cited-badge"></span>
         <div class="confidence-wrap">
-          <span class="muted">confidence</span>
+          <span>confidence</span>
           <div class="confidence-bar"><div class="confidence-fill" id="confidence-fill"></div></div>
         </div>
       </div>
@@ -114,46 +133,59 @@
     </div>
   </section>
 
+  <hr class="divider" />
+
   <!-- MEMORIES -->
   <section class="section fade-in" id="section-memories">
-    <div class="section-header">
-      <div class="section-num">03</div>
-      <div>
-        <h2>Memory Explorer</h2>
-        <p class="section-desc">Browse all stored memories. Importance scores decay over time using <code>e<sup>−λt</sup></code> — older, less-accessed memories fade unless they stay connected.</p>
-      </div>
-    </div>
+    <p class="section-label"><span class="section-num">03</span> Memory Explorer</p>
+    <h2 class="section-title">Everything you've<br><em>ever told it.</em></h2>
+    <p class="section-desc">
+      Importance scores decay using <code>e<sup>−λt</sup></code>. Memories accessed more often or with more graph connections stay relevant longer.
+    </p>
+
     <div class="filter-row">
-      <label class="filter-label">Min importance <span id="importance-val">0.0</span></label>
+      <label class="filter-label">Min importance: <strong id="importance-val">0.0</strong></label>
       <input type="range" id="importance-slider" min="0" max="1" step="0.05" value="0" class="slider" />
-      <button class="btn btn-secondary" id="btn-load-memories">Load Memories</button>
+      <button class="btn btn-secondary" id="btn-load-memories">Load memories</button>
     </div>
-    <div class="memories-grid" id="memories-grid"></div>
-    <button class="btn btn-secondary hidden" id="btn-load-more">Load More</button>
+
+    <div class="memories-list" id="memories-grid"></div>
+    <div style="margin-top:16px">
+      <button class="btn btn-secondary hidden" id="btn-load-more">Load more</button>
+    </div>
   </section>
+
+  <hr class="divider" />
 
   <!-- GRAPH -->
   <section class="section fade-in" id="section-graph">
-    <div class="section-header">
-      <div class="section-num">04</div>
-      <div>
-        <h2>Knowledge Graph</h2>
-        <p class="section-desc">Entities extracted from your context — people, projects, places, topics — linked by co-occurrence. The graph expands retrieval context via N-hop traversal.</p>
-      </div>
-    </div>
+    <p class="section-label"><span class="section-num">04</span> Knowledge Graph</p>
+    <h2 class="section-title">Who, what, where —<br><em>all connected.</em></h2>
+    <p class="section-desc">
+      Entities extracted from every ingested chunk — people, projects, places, topics. Click any entity to see its connected context.
+    </p>
+
     <div class="entity-list" id="entity-list"></div>
-    <button class="btn btn-secondary hidden" id="btn-load-entities">Load Entities</button>
+    <div style="margin-top:16px">
+      <button class="btn btn-secondary hidden" id="btn-load-entities">Load entities</button>
+    </div>
   </section>
+
+  <hr class="divider" />
 
   <!-- FOOTER -->
   <footer class="footer">
-    <div class="wordmark small">ContextWeave</div>
-    <p class="muted">Built by <strong>Vallabh SG</strong> as a demo for <span class="accent">Thine</span></p>
-    <div class="footer-links">
-      <a href="https://github.com/VallabhSG/contextweave" target="_blank" class="footer-link">GitHub</a>
-      <a href="/docs" target="_blank" class="footer-link">API Docs</a>
+    <div class="footer-left">
+      <div class="footer-logo">ContextWeave</div>
+      <p class="footer-copy">Built by Vallabh SG for Thine</p>
     </div>
-    <p class="muted small">Powered by Gemini · ChromaDB · FastAPI</p>
+    <div class="footer-right">
+      <div class="footer-links">
+        <a href="https://github.com/VallabhSG/contextweave" target="_blank" class="footer-link">GitHub</a>
+        <a href="/docs" target="_blank" class="footer-link">API Docs</a>
+      </div>
+      <p class="footer-copy">Gemini · ChromaDB · FastAPI · SQLite</p>
+    </div>
   </footer>
 
   <div class="toast-container" id="toast-container"></div>
