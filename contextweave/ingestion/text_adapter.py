@@ -61,15 +61,19 @@ class TextAdapter(BaseAdapter):
                 )
             )
 
-        return events if events else [
-            ContextEvent(
-                source=SourceType.NOTE,
-                content=raw,
-                timestamp=ts,
-                metadata=meta,
-                raw_format="text",
-            )
-        ]
+        return (
+            events
+            if events
+            else [
+                ContextEvent(
+                    source=SourceType.NOTE,
+                    content=raw,
+                    timestamp=ts,
+                    metadata=meta,
+                    raw_format="text",
+                )
+            ]
+        )
 
     def _split_sections(self, text: str) -> list[dict]:
         """Split markdown by headings into logical sections."""

@@ -331,12 +331,14 @@ async def get_entity(name: str):
     for cid in chunk_ids[:50]:
         chunk = store.get_chunk(cid)
         if chunk:
-            chunks.append({
-                "id": chunk.id,
-                "content": chunk.content[:300],
-                "source": chunk.source.value,
-                "timestamp": chunk.timestamp.isoformat(),
-            })
+            chunks.append(
+                {
+                    "id": chunk.id,
+                    "content": chunk.content[:300],
+                    "source": chunk.source.value,
+                    "timestamp": chunk.timestamp.isoformat(),
+                }
+            )
 
     return {"entity": entity.model_dump(), "connected_chunks": chunks}
 

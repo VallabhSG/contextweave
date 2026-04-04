@@ -101,8 +101,20 @@ class TestMemoryStore:
         assert notes[0].source == SourceType.NOTE
 
     def test_list_memories_filter_by_importance(self, store):
-        low = Memory(chunk_ids=["c1"], summary="low", source=SourceType.NOTE, timestamp=datetime.utcnow(), importance=0.2)
-        high = Memory(chunk_ids=["c2"], summary="high", source=SourceType.NOTE, timestamp=datetime.utcnow(), importance=0.9)
+        low = Memory(
+            chunk_ids=["c1"],
+            summary="low",
+            source=SourceType.NOTE,
+            timestamp=datetime.utcnow(),
+            importance=0.2,
+        )
+        high = Memory(
+            chunk_ids=["c2"],
+            summary="high",
+            source=SourceType.NOTE,
+            timestamp=datetime.utcnow(),
+            importance=0.9,
+        )
         store.save_memory(low)
         store.save_memory(high)
 

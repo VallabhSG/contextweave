@@ -58,7 +58,7 @@ class SemanticChunker:
                 chunks.append(self._make_chunk(event, chunk_text, window_start, i))
 
                 # Overlap: keep last N lines
-                overlap = window[-self.overlap_sentences:] if self.overlap_sentences else []
+                overlap = window[-self.overlap_sentences :] if self.overlap_sentences else []
                 window = overlap
                 window_start = max(0, i - len(overlap))
                 token_count = sum(self._estimate_tokens(ln) for ln in window)
@@ -116,9 +116,7 @@ class SemanticChunker:
             char_offset += len(para) + 2
 
         if buffer:
-            chunks.append(
-                self._make_chunk(event, "\n\n".join(buffer), buffer_start, char_offset)
-            )
+            chunks.append(self._make_chunk(event, "\n\n".join(buffer), buffer_start, char_offset))
 
         return chunks
 
@@ -129,9 +127,7 @@ class SemanticChunker:
             return [self._make_chunk(event, event.content, 0, len(event.content))]
         return self._chunk_prose(event)
 
-    def _split_sentences(
-        self, text: str, event: ContextEvent, base_offset: int
-    ) -> list[Chunk]:
+    def _split_sentences(self, text: str, event: ContextEvent, base_offset: int) -> list[Chunk]:
         """Split a long paragraph into sentence-based chunks."""
         sentences = re.split(r"(?<=[.!?])\s+", text)
         chunks = []
@@ -142,9 +138,11 @@ class SemanticChunker:
             s_tokens = self._estimate_tokens(sentence)
             if token_count + s_tokens > self.max_tokens and window:
                 chunk_text = " ".join(window)
-                chunks.append(self._make_chunk(event, chunk_text, base_offset, base_offset + len(chunk_text)))
+                chunks.append(
+                    self._make_chunk(event, chunk_text, base_offset, base_offset + len(chunk_text))
+                )
 
-                overlap = window[-self.overlap_sentences:]
+                overlap = window[-self.overlap_sentences :]
                 window = overlap
                 token_count = sum(self._estimate_tokens(s) for s in window)
 
@@ -153,13 +151,13 @@ class SemanticChunker:
 
         if window:
             chunk_text = " ".join(window)
-            chunks.append(self._make_chunk(event, chunk_text, base_offset, base_offset + len(chunk_text)))
+            chunks.append(
+                self._make_chunk(event, chunk_text, base_offset, base_offset + len(chunk_text))
+            )
 
         return chunks
 
-    def _make_chunk(
-        self, event: ContextEvent, content: str, start: int, end: int
-    ) -> Chunk:
+    def _make_chunk(self, event: ContextEvent, content: str, start: int, end: int) -> Chunk:
         return Chunk(
             id=str(uuid.uuid4()),
             event_id=event.id,

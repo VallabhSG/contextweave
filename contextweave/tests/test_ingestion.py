@@ -92,7 +92,11 @@ class TestBrowserAdapter:
         adapter = BrowserAdapter()
         history = {
             "Browser History": [
-                {"title": f"Page {i}", "url": f"https://example.com/page{i}", "time_usec": "13369977600000000"}
+                {
+                    "title": f"Page {i}",
+                    "url": f"https://example.com/page{i}",
+                    "time_usec": "13369977600000000",
+                }
                 for i in range(5)
             ]
         }
