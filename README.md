@@ -4,6 +4,13 @@ A personal long-term memory and context reasoning engine. Ingests ambient contex
 
 Built to demonstrate the core technical challenge behind products like [Thine](https://thine.ai): not just storing context, but structuring it, scoring it with temporal decay, and reasoning across it to surface insights you didn't know to ask for.
 
+**Live API:** `https://contextweave.onrender.com` · [Interactive docs](https://contextweave.onrender.com/docs)
+
+```bash
+# Try it now (no auth required)
+curl https://contextweave.onrender.com/api/health
+```
+
 ---
 
 ## Architecture
@@ -127,13 +134,34 @@ Six query types automatically detected from query keywords:
 
 ## Quickstart
 
-### 1. Install dependencies
+### Try the live API
+
+```bash
+# Health check
+curl https://contextweave.onrender.com/api/health
+
+# Ingest a note
+curl -X POST https://contextweave.onrender.com/api/ingest/text \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Met with Alice today about Project Alpha. We decided to prioritize the memory retrieval layer."}'
+
+# Query it
+curl -X POST https://contextweave.onrender.com/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What did I decide about Project Alpha?"}'
+```
+
+Interactive docs: [https://contextweave.onrender.com/docs](https://contextweave.onrender.com/docs)
+
+### Run locally
+
+#### 1. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure
+#### 2. Configure
 
 ```bash
 cp .env.example .env
@@ -142,7 +170,7 @@ cp .env.example .env
 
 Get a free Gemini API key at [aistudio.google.com](https://aistudio.google.com/app/apikey).
 
-### 3. Run
+#### 3. Run
 
 ```bash
 python -m uvicorn main:app --reload
