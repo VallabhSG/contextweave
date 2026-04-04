@@ -35,8 +35,16 @@ CREATE TABLE IF NOT EXISTS entity_edges (
     FOREIGN KEY (target) REFERENCES entities(name)
 );
 
+CREATE TABLE IF NOT EXISTS entity_chunks (
+    entity_name TEXT NOT NULL,
+    chunk_id TEXT NOT NULL,
+    PRIMARY KEY (entity_name, chunk_id),
+    FOREIGN KEY (entity_name) REFERENCES entities(name)
+);
+
 CREATE INDEX IF NOT EXISTS idx_edges_source ON entity_edges(source);
 CREATE INDEX IF NOT EXISTS idx_edges_target ON entity_edges(target);
+CREATE INDEX IF NOT EXISTS idx_entity_chunks_name ON entity_chunks(entity_name);
 """
 
 
@@ -117,6 +125,12 @@ class KnowledgeGraph:
                 )
                 entity_names.append(entity.name)
 
+                # Direct entity → chunk mapping (always works, even for solo entities)
+                conn.execute(
+                    "INSERT OR IGNORE INTO entity_chunks (entity_name, chunk_id) VALUES (?, ?)",
+                    (entity.name, chunk_id),
+                )
+
             # Create co-occurrence edges between all entities in this chunk
             for i, src in enumerate(entity_names):
                 for tgt in entity_names[i + 1 :]:
@@ -171,6 +185,15 @@ class KnowledgeGraph:
         chunk_ids = set()
         with self._conn() as conn:
             for name in neighbors:
+                # Direct entity→chunk mappings (primary source)
+                rows = conn.execute(
+                    "SELECT chunk_id FROM entity_chunks WHERE entity_name = ?",
+                    (name,),
+                ).fetchall()
+                for row in rows:
+                    chunk_ids.add(row["chunk_id"])
+
+                # Co-occurrence edges (supplementary)
                 edges = conn.execute(
                     "SELECT co_occurrence_chunks FROM entity_edges WHERE source = ? OR target = ?",
                     (name, name),
