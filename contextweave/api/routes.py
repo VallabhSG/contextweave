@@ -188,11 +188,13 @@ async def _process_events(events) -> IngestResponse:
 
     # Extract entities and attach to chunks
     total_entities = 0
+    processed_chunks = []
     for chunk in chunks:
         entities = extractor.extract_from_chunk(chunk)
         entity_names = [e.name for e in entities]
         chunk = chunk.model_copy(update={"entities": entity_names})
         total_entities += len(entities)
+        processed_chunks.append(chunk)
 
         # Update knowledge graph
         if entities:
@@ -213,8 +215,8 @@ async def _process_events(events) -> IngestResponse:
         )
         store.save_memory(memory)
 
-    # Store embeddings in vector store
-    vstore.add_chunks(chunks)
+    # Store embeddings in vector store (with entity metadata attached)
+    vstore.add_chunks(processed_chunks)
 
     return IngestResponse(
         events_created=len(events),
