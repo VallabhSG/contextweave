@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
@@ -124,11 +125,20 @@ class MemoryStore:
 
     def search_fts(self, query: str, limit: int = 20) -> list[dict]:
         """Full-text search over chunks."""
+        # Escape FTS5 special characters to prevent OperationalError
+        safe_query = re.sub(r'["()*:]', " ", query).strip()
+        if not safe_query:
+            return []
+
         with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT id, rank FROM chunks_fts WHERE chunks_fts MATCH ? ORDER BY rank LIMIT ?",
-                (query, limit),
-            ).fetchall()
+            try:
+                rows = conn.execute(
+                    "SELECT id, rank FROM chunks_fts WHERE chunks_fts MATCH ? ORDER BY rank LIMIT ?",
+                    (safe_query, limit),
+                ).fetchall()
+            except sqlite3.OperationalError:
+                logger.warning("FTS query failed for: %s", safe_query)
+                return []
 
             results = []
             for row in rows:

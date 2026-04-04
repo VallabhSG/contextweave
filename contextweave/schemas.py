@@ -59,7 +59,7 @@ class Memory(BaseModel):
     importance: float = 0.5
     access_count: int = 0
     last_accessed: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
 
 
 class Entity(BaseModel):
