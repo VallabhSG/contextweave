@@ -38,6 +38,9 @@ class HybridRetriever:
         query: str,
         top_k: int | None = None,
         source_filter: str | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        extra_terms: list[str] | None = None,
     ) -> list[QueryResult]:
         """Execute hybrid retrieval and return ranked results."""
         final_k = top_k or settings.retrieval_final_k
@@ -54,8 +57,15 @@ class HybridRetriever:
         except Exception as e:
             logger.warning("Vector search skipped: %s", e)
 
-        # 2. Full-text search
+        # 2. Full-text search (primary + expanded terms)
         fts_results = self.memory_store.search_fts(query, limit=settings.retrieval_top_k)
+        if extra_terms:
+            seen_ids = {r["chunk_id"] for r in fts_results}
+            for term in extra_terms[:4]:
+                for r in self.memory_store.search_fts(term, limit=10):
+                    if r["chunk_id"] not in seen_ids:
+                        fts_results.append(r)
+                        seen_ids.add(r["chunk_id"])
 
         # 3. Graph expansion — extract entity names from query results
         graph_chunk_ids = set()
@@ -154,7 +164,15 @@ class HybridRetriever:
         if source_filter:
             results = [r for r in results if r.source.value == source_filter]
 
-        # 7. Sort by score descending and return top K
+        # 7. Filter by date range if specified
+        if date_from or date_to:
+            results = [
+                r for r in results
+                if (date_from is None or r.timestamp >= date_from)
+                and (date_to is None or r.timestamp <= date_to)
+            ]
+
+        # 8. Sort by score descending and return top K
         results.sort(key=lambda r: r.score, reverse=True)
         return results[:final_k]
 

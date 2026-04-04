@@ -30,7 +30,7 @@
       Your context,<br><em>finally connected.</em>
     </h1>
     <p class="hero-sub">
-      Ingests conversations, notes, and calendar events. Scores them with temporal decay. Surfaces what matters through hybrid retrieval and Gemini reasoning.
+      Ingests conversations, notes, and calendar events. Scores them with temporal decay. Surfaces what matters through hybrid retrieval and LLM reasoning.
     </p>
     <div class="hero-stats">
       <div class="hero-stat"><span class="hero-stat-num" id="stat-events">—</span><span class="hero-stat-label">Events</span></div>
@@ -51,7 +51,7 @@
     <p class="section-label"><span class="section-num">01</span> Ingestion</p>
     <h2 class="section-title">Feed the memory.</h2>
     <p class="section-desc">
-      Paste any text or upload a file. ContextWeave chunks it semantically, embeds it with <code>text-embedding-004</code>, extracts entities via Gemini NER, and stores it with an importance score.
+      Paste any text or upload a file. ContextWeave chunks it semantically, embeds it locally with <code>fastembed</code>, extracts entities via Groq LLM, and stores it with an importance score.
     </p>
 
     <div class="card-grid">
@@ -105,7 +105,7 @@
     <p class="section-label"><span class="section-num">02</span> Retrieval & Reasoning</p>
     <h2 class="section-title">Ask your memory<em>.</em></h2>
     <p class="section-desc">
-      Hybrid retrieval fuses vector similarity (50%), full-text search (30%), and knowledge graph traversal (20%), re-ranked by temporal decay. Gemini reasons over the top results.
+      Hybrid retrieval fuses vector similarity (50%), full-text search (30%), and knowledge graph traversal (20%), re-ranked by temporal decay. Groq LLM reasons over the top results.
     </p>
 
     <div class="query-bar">
@@ -119,6 +119,13 @@
       <button class="btn-ghost" data-query="What am I avoiding or missing?">Gaps</button>
     </div>
 
+    <div class="date-filter-row">
+      <label class="filter-label">From <input type="date" id="date-from" class="date-input" /></label>
+      <label class="filter-label">To <input type="date" id="date-to" class="date-input" /></label>
+    </div>
+
+    <div id="expanded-terms" class="expanded-terms-row"></div>
+
     <div class="card response-card hidden" id="response-card">
       <div class="response-meta">
         <span class="badge badge-accent" id="query-type-badge"></span>
@@ -131,6 +138,7 @@
       <div class="response-body" id="response-body"></div>
       <div class="patterns-row" id="patterns-row"></div>
     </div>
+    <div id="suggested-queries"></div>
   </section>
 
   <hr class="divider" />
@@ -165,10 +173,11 @@
       Entities extracted from every ingested chunk — people, projects, places, topics. Click any entity to see its connected context.
     </p>
 
-    <div class="entity-list" id="entity-list"></div>
-    <div style="margin-top:16px">
+    <div class="entity-actions">
       <button class="btn btn-secondary hidden" id="btn-load-entities">Load entities</button>
+      <button class="btn btn-secondary" id="btn-surprise-me">⚡ Surprise me</button>
     </div>
+    <div class="entity-list" id="entity-list"></div>
   </section>
 
   <hr class="divider" />
@@ -184,7 +193,7 @@
         <a href="https://github.com/VallabhSG/contextweave" target="_blank" class="footer-link">GitHub</a>
         <a href="/docs" target="_blank" class="footer-link">API Docs</a>
       </div>
-      <p class="footer-copy">Gemini · ChromaDB · FastAPI · SQLite</p>
+      <p class="footer-copy">fastembed · Groq · ChromaDB · FastAPI · SQLite</p>
     </div>
   </footer>
 

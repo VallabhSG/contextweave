@@ -93,3 +93,5 @@ class ReasoningResponse(BaseModel):
     confidence: float = 0.0
     patterns: list[str] = Field(default_factory=list)
     query_type: str = "general"
+    suggested_queries: list[str] = Field(default_factory=list)
+    expanded_terms: list[str] = Field(default_factory=list)

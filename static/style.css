@@ -294,6 +294,47 @@ body {
 }
 .entity-chunk:last-child { border-bottom: none; }
 
+/* ── ENTITY TYPE COLORS ── */
+/* ── ACCESS BADGE ── */
+.access-badge {
+  font-family: var(--mono); font-size: 0.68rem; padding: 1px 7px;
+  border-radius: 999px; border: 1px solid var(--border);
+  color: var(--text-3); background: transparent;
+}
+
+/* ── ENTITY TYPE COLORS ── */
+.entity-type-person { border-color: #3b82f6; color: #3b82f6; }
+.entity-type-project { border-color: #f97316; color: #f97316; }
+.entity-type-topic { border-color: #22c55e; color: #22c55e; }
+.entity-type-org { border-color: #a855f7; color: #a855f7; }
+.entity-type-place { border-color: #14b8a6; color: #14b8a6; }
+
+/* ── DATE FILTER ── */
+.date-filter-row {
+  display: flex; gap: 16px; align-items: center; margin-top: 10px; flex-wrap: wrap;
+}
+.date-input {
+  font-family: var(--mono); font-size: 0.8rem; padding: 4px 10px;
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--bg);
+  color: var(--text); outline: none; margin-left: 6px;
+}
+.date-input:focus { border-color: var(--border-dark); }
+
+/* ── EXPANDED TERMS ── */
+.expanded-terms-row { display: flex; flex-wrap: wrap; gap: 6px; min-height: 0; margin-top: 8px; }
+
+/* ── SUGGESTED QUERIES ── */
+.btn-suggestion {
+  display: inline-block; font-family: var(--sans); font-size: 0.8rem;
+  padding: 6px 14px; margin: 4px 4px 0 0;
+  border: 1px solid var(--border); border-radius: var(--r); background: transparent;
+  color: var(--text-2); cursor: pointer; transition: all 0.15s;
+}
+.btn-suggestion:hover { border-color: var(--border-dark); color: var(--text); background: rgba(14,14,12,0.03); }
+
+/* ── ENTITY ACTIONS ── */
+.entity-actions { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+
 /* ── FOOTER ── */
 .footer {
   border-top: 1px solid var(--border);

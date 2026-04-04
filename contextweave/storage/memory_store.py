@@ -229,6 +229,23 @@ class MemoryStore:
                 (datetime.utcnow().isoformat(), memory_id),
             )
 
+    def record_chunk_access(self, chunk_id: str) -> None:
+        """Record access for the memory that contains this chunk."""
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE memories SET access_count = access_count + 1, last_accessed = ? WHERE chunk_ids LIKE ?",
+                (datetime.utcnow().isoformat(), f'%"{chunk_id}"%'),
+            )
+
+    def list_most_accessed(self, limit: int = 20) -> list[Memory]:
+        """Return memories ordered by access frequency."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM memories WHERE access_count > 0 ORDER BY access_count DESC, last_accessed DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+            return [self._row_to_memory(r) for r in rows]
+
     def stats(self) -> dict:
         with self._conn() as conn:
             events = conn.execute("SELECT COUNT(*) as c FROM events").fetchone()["c"]
