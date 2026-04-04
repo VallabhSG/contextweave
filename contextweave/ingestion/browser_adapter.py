@@ -25,7 +25,9 @@ class BrowserAdapter(BaseAdapter):
         meta = metadata or {}
         data = json.loads(raw)
 
-        entries = data if isinstance(data, list) else data.get("Browser History", data.get("history", []))
+        entries = (
+            data if isinstance(data, list) else data.get("Browser History", data.get("history", []))
+        )
 
         events = []
         window: list[dict] = []

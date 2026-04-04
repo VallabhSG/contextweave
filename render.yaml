@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: contextweave
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: CW_GEMINI_API_KEY
+        sync: false
+      - key: CW_CHROMA_PERSIST_DIR
+        value: /opt/render/project/src/chroma_data
+      - key: CW_SQLITE_DB_PATH
+        value: /opt/render/project/src/contextweave.db
+    disk:
+      name: data
+      mountPath: /opt/render/project/src
+      sizeGB: 1

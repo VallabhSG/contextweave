@@ -91,7 +91,14 @@ class MemoryStore:
         with self._conn() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO events (id, source, content, timestamp, metadata, raw_format) VALUES (?, ?, ?, ?, ?, ?)",
-                (event.id, event.source.value, event.content, event.timestamp.isoformat(), json.dumps(event.metadata), event.raw_format),
+                (
+                    event.id,
+                    event.source.value,
+                    event.content,
+                    event.timestamp.isoformat(),
+                    json.dumps(event.metadata),
+                    event.raw_format,
+                ),
             )
 
     def save_events(self, events: list[ContextEvent]) -> int:
@@ -105,10 +112,23 @@ class MemoryStore:
         with self._conn() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO chunks (id, event_id, content, start_idx, end_idx, timestamp, source, entities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (chunk.id, chunk.event_id, chunk.content, chunk.start_idx, chunk.end_idx, chunk.timestamp.isoformat(), chunk.source.value, json.dumps(chunk.entities), json.dumps(chunk.metadata)),
+                (
+                    chunk.id,
+                    chunk.event_id,
+                    chunk.content,
+                    chunk.start_idx,
+                    chunk.end_idx,
+                    chunk.timestamp.isoformat(),
+                    chunk.source.value,
+                    json.dumps(chunk.entities),
+                    json.dumps(chunk.metadata),
+                ),
             )
             # Update FTS index
-            conn.execute("INSERT OR REPLACE INTO chunks_fts (id, content, entities) VALUES (?, ?, ?)", (chunk.id, chunk.content, " ".join(chunk.entities)))
+            conn.execute(
+                "INSERT OR REPLACE INTO chunks_fts (id, content, entities) VALUES (?, ?, ?)",
+                (chunk.id, chunk.content, " ".join(chunk.entities)),
+            )
 
     def save_chunks(self, chunks: list[Chunk]) -> int:
         for chunk in chunks:
@@ -143,7 +163,16 @@ class MemoryStore:
             for row in rows:
                 chunk = self.get_chunk(row["id"])
                 if chunk:
-                    results.append({"chunk_id": chunk.id, "content": chunk.content, "fts_rank": row["rank"], "source": chunk.source, "timestamp": chunk.timestamp, "entities": chunk.entities})
+                    results.append(
+                        {
+                            "chunk_id": chunk.id,
+                            "content": chunk.content,
+                            "fts_rank": row["rank"],
+                            "source": chunk.source,
+                            "timestamp": chunk.timestamp,
+                            "entities": chunk.entities,
+                        }
+                    )
             return results
 
     # ── Memories ────────────────────────────────────────────
@@ -152,7 +181,18 @@ class MemoryStore:
         with self._conn() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO memories (id, chunk_ids, summary, entities, source, timestamp, importance, access_count, last_accessed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (memory.id, json.dumps(memory.chunk_ids), memory.summary, json.dumps(memory.entities), memory.source.value, memory.timestamp.isoformat(), memory.importance, memory.access_count, memory.last_accessed.isoformat() if memory.last_accessed else None, memory.created_at.isoformat()),
+                (
+                    memory.id,
+                    json.dumps(memory.chunk_ids),
+                    memory.summary,
+                    json.dumps(memory.entities),
+                    memory.source.value,
+                    memory.timestamp.isoformat(),
+                    memory.importance,
+                    memory.access_count,
+                    memory.last_accessed.isoformat() if memory.last_accessed else None,
+                    memory.created_at.isoformat(),
+                ),
             )
 
     def get_memory(self, memory_id: str) -> Memory | None:
@@ -223,6 +263,8 @@ class MemoryStore:
             timestamp=datetime.fromisoformat(row["timestamp"]),
             importance=row["importance"],
             access_count=row["access_count"],
-            last_accessed=datetime.fromisoformat(row["last_accessed"]) if row["last_accessed"] else None,
+            last_accessed=datetime.fromisoformat(row["last_accessed"])
+            if row["last_accessed"]
+            else None,
             created_at=datetime.fromisoformat(row["created_at"]),
         )

@@ -80,8 +80,15 @@ class ImportanceScorer:
 
         # Content signals
         importance_signals = [
-            "important", "critical", "decision", "agreed", "deadline",
-            "action item", "follow up", "remember", "key takeaway",
+            "important",
+            "critical",
+            "decision",
+            "agreed",
+            "deadline",
+            "action item",
+            "follow up",
+            "remember",
+            "key takeaway",
         ]
         content_lower = content.lower()
         signal_count = sum(1 for s in importance_signals if s in content_lower)

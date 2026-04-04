@@ -48,12 +48,14 @@ class VectorStore:
                 ids=[chunk.id],
                 embeddings=[chunk.embedding],
                 documents=[chunk.content],
-                metadatas=[{
-                    "event_id": chunk.event_id,
-                    "source": chunk.source.value,
-                    "timestamp": chunk.timestamp.isoformat(),
-                    "entities": ",".join(chunk.entities),
-                }],
+                metadatas=[
+                    {
+                        "event_id": chunk.event_id,
+                        "source": chunk.source.value,
+                        "timestamp": chunk.timestamp.isoformat(),
+                        "entities": ",".join(chunk.entities),
+                    }
+                ],
             )
             added += 1
 
@@ -82,13 +84,15 @@ class VectorStore:
         items = []
         if results["ids"] and results["ids"][0]:
             for i, chunk_id in enumerate(results["ids"][0]):
-                items.append({
-                    "chunk_id": chunk_id,
-                    "content": results["documents"][0][i],
-                    "metadata": results["metadatas"][0][i],
-                    "distance": results["distances"][0][i],
-                    "score": 1.0 - results["distances"][0][i],  # cosine: distance=1-similarity
-                })
+                items.append(
+                    {
+                        "chunk_id": chunk_id,
+                        "content": results["documents"][0][i],
+                        "metadata": results["metadatas"][0][i],
+                        "distance": results["distances"][0][i],
+                        "score": 1.0 - results["distances"][0][i],  # cosine: distance=1-similarity
+                    }
+                )
 
         return items
 

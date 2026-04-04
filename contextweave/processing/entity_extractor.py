@@ -88,23 +88,17 @@ class EntityExtractor:
         # Extract @mentions
         mentions = re.findall(r"@(\w+)", chunk.content)
         for m in mentions:
-            entities.append(
-                Entity(name=m, entity_type="person", first_seen=now, last_seen=now)
-            )
+            entities.append(Entity(name=m, entity_type="person", first_seen=now, last_seen=now))
 
         # Extract capitalized multi-word names (simple heuristic)
         names = re.findall(r"\b([A-Z][a-z]+ [A-Z][a-z]+)\b", chunk.content)
         for name in set(names):
-            entities.append(
-                Entity(name=name, entity_type="person", first_seen=now, last_seen=now)
-            )
+            entities.append(Entity(name=name, entity_type="person", first_seen=now, last_seen=now))
 
         # Extract URLs as topics
         urls = re.findall(r"https?://\S+", chunk.content)
         for url in urls[:5]:
             domain = url.split("://")[1].split("/")[0] if "://" in url else url
-            entities.append(
-                Entity(name=domain, entity_type="topic", first_seen=now, last_seen=now)
-            )
+            entities.append(Entity(name=domain, entity_type="topic", first_seen=now, last_seen=now))
 
         return entities

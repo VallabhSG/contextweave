@@ -95,8 +95,12 @@ class HybridRetriever:
                     "fts_score": fts_normalized,
                     "graph_score": 0.0,
                     "metadata": {
-                        "source": fr["source"].value if hasattr(fr["source"], "value") else str(fr["source"]),
-                        "timestamp": fr["timestamp"].isoformat() if isinstance(fr["timestamp"], datetime) else str(fr["timestamp"]),
+                        "source": fr["source"].value
+                        if hasattr(fr["source"], "value")
+                        else str(fr["source"]),
+                        "timestamp": fr["timestamp"].isoformat()
+                        if isinstance(fr["timestamp"], datetime)
+                        else str(fr["timestamp"]),
                         "entities": ",".join(fr.get("entities", [])),
                     },
                 }
@@ -111,17 +115,13 @@ class HybridRetriever:
         for item in scored.values():
             # Weighted fusion: 50% vector + 30% FTS + 20% graph
             combined = (
-                0.5 * item["vector_score"]
-                + 0.3 * item["fts_score"]
-                + 0.2 * item["graph_score"]
+                0.5 * item["vector_score"] + 0.3 * item["fts_score"] + 0.2 * item["graph_score"]
             )
 
             # Apply temporal decay
             ts = self._parse_timestamp(item["metadata"].get("timestamp", ""))
             entities = [e for e in item["metadata"].get("entities", "").split(",") if e.strip()]
-            conn_count = sum(
-                self.knowledge_graph.connection_count(e) for e in entities
-            )
+            conn_count = sum(self.knowledge_graph.connection_count(e) for e in entities)
             importance = self.scorer.score(
                 base_importance=combined,
                 timestamp=ts,

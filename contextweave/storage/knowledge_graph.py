@@ -100,13 +100,20 @@ class KnowledgeGraph:
                 else:
                     conn.execute(
                         "INSERT INTO entities (name, entity_type, first_seen, last_seen, mention_count) VALUES (?, ?, ?, ?, ?)",
-                        (entity.name, entity.entity_type, entity.first_seen.isoformat(), entity.last_seen.isoformat(), 1),
+                        (
+                            entity.name,
+                            entity.entity_type,
+                            entity.first_seen.isoformat(),
+                            entity.last_seen.isoformat(),
+                            1,
+                        ),
                     )
 
                 self._graph.add_node(
                     entity.name,
                     entity_type=entity.entity_type,
-                    mention_count=self._graph.nodes.get(entity.name, {}).get("mention_count", 0) + 1,
+                    mention_count=self._graph.nodes.get(entity.name, {}).get("mention_count", 0)
+                    + 1,
                 )
                 entity_names.append(entity.name)
 
@@ -132,7 +139,8 @@ class KnowledgeGraph:
                         )
 
                     self._graph.add_edge(
-                        src, tgt,
+                        src,
+                        tgt,
                         weight=self._graph.edges.get((src, tgt), {}).get("weight", 0) + 1,
                     )
 

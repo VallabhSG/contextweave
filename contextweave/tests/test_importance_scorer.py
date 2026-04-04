@@ -72,7 +72,9 @@ class TestImportanceScorer:
 
     def test_importance_signals_boost_score(self, scorer):
         plain = scorer.estimate_base_importance("Had a meeting today", "note")
-        signal = scorer.estimate_base_importance("IMPORTANT: action item - follow up on deadline", "note")
+        signal = scorer.estimate_base_importance(
+            "IMPORTANT: action item - follow up on deadline", "note"
+        )
         assert signal > plain
 
     def test_short_content_slightly_lower(self, scorer):
