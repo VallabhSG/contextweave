@@ -1,3 +1,12 @@
+---
+title: ContextWeave
+emoji: 🧠
+colorFrom: yellow
+colorTo: gray
+sdk: docker
+pinned: true
+---
+
 # ContextWeave
 
 A personal long-term memory and context reasoning engine. Ingests ambient context from conversations, notes, browser history, and calendar events — then lets you query patterns and answers across your entire life data stream.

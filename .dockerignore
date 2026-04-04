@@ -1,0 +1,11 @@
+.git
+.github
+.env
+*.db
+chroma_data/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+contextweave/tests/
+.python-version
