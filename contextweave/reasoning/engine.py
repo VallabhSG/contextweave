@@ -28,15 +28,10 @@ class ReasoningEngine:
         self._model_name = settings.reasoning_model
         self._model = None
 
-    def _get_model(self):
+    def _get_client(self):
         if self._model is None:
-            import google.generativeai as genai
-
-            genai.configure(api_key=self._api_key)
-            self._model = genai.GenerativeModel(
-                self._model_name,
-                system_instruction=SYSTEM_PROMPT,
-            )
+            from google import genai
+            self._model = genai.Client(api_key=self._api_key)
         return self._model
 
     def reason(
@@ -62,14 +57,17 @@ class ReasoningEngine:
 
         prompt = prompt_template.format(context=context_str, query=query)
 
-        model = self._get_model()
+        from google.genai import types
+        client = self._get_client()
         try:
-            response = model.generate_content(
-                prompt,
-                generation_config={
-                    "temperature": 0.3,
-                    "max_output_tokens": 2048,
-                },
+            response = client.models.generate_content(
+                model=self._model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    temperature=0.3,
+                    max_output_tokens=2048,
+                ),
             )
 
             answer = response.text
