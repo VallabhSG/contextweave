@@ -44,22 +44,54 @@ class VectorStore:
                 logger.warning("Skipping chunk %s — no embedding", chunk.id)
                 continue
 
-            collection.upsert(
-                ids=[chunk.id],
-                embeddings=[chunk.embedding],
-                documents=[chunk.content],
-                metadatas=[
-                    {
-                        "event_id": chunk.event_id,
-                        "source": chunk.source.value,
-                        "timestamp": chunk.timestamp.isoformat(),
-                        "entities": ",".join(chunk.entities),
-                    }
-                ],
-            )
-            added += 1
+            try:
+                collection.upsert(
+                    ids=[chunk.id],
+                    embeddings=[chunk.embedding],
+                    documents=[chunk.content],
+                    metadatas=[
+                        {
+                            "event_id": chunk.event_id,
+                            "source": chunk.source.value,
+                            "timestamp": chunk.timestamp.isoformat(),
+                            "entities": ",".join(chunk.entities),
+                        }
+                    ],
+                )
+                added += 1
+            except Exception as e:
+                if "dimensionality" in str(e).lower() or "dimension" in str(e).lower():
+                    logger.warning("Dimension mismatch — recreating collection: %s", e)
+                    self._reset_collection()
+                    collection = self._get_collection()
+                    collection.upsert(
+                        ids=[chunk.id],
+                        embeddings=[chunk.embedding],
+                        documents=[chunk.content],
+                        metadatas=[
+                            {
+                                "event_id": chunk.event_id,
+                                "source": chunk.source.value,
+                                "timestamp": chunk.timestamp.isoformat(),
+                                "entities": ",".join(chunk.entities),
+                            }
+                        ],
+                    )
+                    added += 1
+                else:
+                    logger.error("Failed to upsert chunk %s: %s", chunk.id, e)
 
         return added
+
+    def _reset_collection(self) -> None:
+        """Delete and recreate the collection (handles embedding dimension changes)."""
+        if self._client is not None:
+            try:
+                self._client.delete_collection(self._collection_name)
+            except Exception:
+                pass
+        self._collection = None
+        self._client = None
 
     def query(
         self,

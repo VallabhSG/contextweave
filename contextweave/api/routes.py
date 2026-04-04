@@ -13,7 +13,7 @@ from contextweave.ingestion.calendar_adapter import CalendarAdapter
 from contextweave.ingestion.chat_adapter import ChatAdapter
 from contextweave.ingestion.text_adapter import TextAdapter
 from contextweave.processing.chunker import SemanticChunker
-from contextweave.processing.embedder import GeminiEmbedder
+from contextweave.processing.embedder import GeminiEmbedder  # fastembed-backed, name kept for compat
 from contextweave.processing.entity_extractor import EntityExtractor
 from contextweave.processing.importance_scorer import ImportanceScorer
 from contextweave.reasoning.engine import ReasoningEngine
@@ -355,49 +355,58 @@ async def get_entity(name: str):
 # ── Debug ───────────────────────────────────────────────────
 
 
-@router.get("/debug/gemini")
-async def debug_gemini():
-    """Test Gemini API connectivity. Useful for diagnosing key/quota issues."""
+@router.get("/debug/status")
+async def debug_status():
+    """Test embedding and generation stack health."""
     from contextweave.config import settings as cfg
-
-    key_set = bool(cfg.gemini_api_key)
-    key_preview = (cfg.gemini_api_key[:8] + "…") if key_set else "NOT SET"
 
     embed_ok, embed_error = False, ""
     gen_ok, gen_error = False, ""
+    groq_key_set = bool(cfg.groq_api_key)
 
-    if key_set:
-        try:
-            from google import genai
-            client = genai.Client(api_key=cfg.gemini_api_key)
-            result = client.models.embed_content(model=cfg.embedding_model, contents="test")
-            embed_ok = len(result.embeddings[0].values) > 0
-        except Exception as e:
-            embed_error = str(e)
+    # Test local fastembed
+    try:
+        from fastembed import TextEmbedding
+        model = TextEmbedding(model_name=cfg.embedding_model)
+        embs = list(model.embed(["test"]))
+        embed_ok = len(embs[0]) > 0
+    except Exception as e:
+        embed_error = str(e)
 
+    # Test Groq generation
+    if groq_key_set:
         try:
-            from google import genai
-            from google.genai import types
-            client = genai.Client(api_key=cfg.gemini_api_key)
-            r = client.models.generate_content(
+            from groq import Groq
+            client = Groq(api_key=cfg.groq_api_key)
+            r = client.chat.completions.create(
                 model=cfg.reasoning_model,
-                contents="Say OK",
-                config=types.GenerateContentConfig(max_output_tokens=5),
+                messages=[{"role": "user", "content": "Say OK"}],
+                max_tokens=5,
             )
-            gen_ok = bool(r.text)
+            gen_ok = bool(r.choices[0].message.content)
         except Exception as e:
             gen_error = str(e)
+    else:
+        gen_error = "CW_GROQ_API_KEY not set — get a free key at console.groq.com"
 
     return {
-        "api_key_set": key_set,
-        "api_key_preview": key_preview,
+        "embedding_backend": "fastembed (local)",
         "embedding_model": cfg.embedding_model,
-        "reasoning_model": cfg.reasoning_model,
         "embedding_ok": embed_ok,
         "embedding_error": embed_error,
+        "generation_backend": "groq",
+        "generation_model": cfg.reasoning_model,
+        "groq_key_set": groq_key_set,
         "generation_ok": gen_ok,
         "generation_error": gen_error,
     }
+
+
+# Keep old path as alias so existing bookmarks still work
+@router.get("/debug/gemini")
+async def debug_gemini():
+    """Alias for /debug/status."""
+    return await debug_status()
 
 
 # ── Health ──────────────────────────────────────────────────

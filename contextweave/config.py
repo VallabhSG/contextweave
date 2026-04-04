@@ -8,17 +8,17 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    gemini_api_key: str = ""
-    embedding_model: str = "text-embedding-004"
-    reasoning_model: str = "gemini-2.0-flash"
-    extraction_model: str = "gemini-2.0-flash"
+    groq_api_key: str = ""
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    reasoning_model: str = "llama-3.1-8b-instant"
+    extraction_model: str = "llama-3.1-8b-instant"
 
     chroma_persist_dir: str = "./chroma_data"
     sqlite_db_path: str = "./contextweave.db"
 
     chunk_max_tokens: int = 512
     chunk_overlap_sentences: int = 2
-    embedding_dimension: int = 768
+    embedding_dimension: int = 384
 
     retrieval_top_k: int = 20
     retrieval_final_k: int = 8
