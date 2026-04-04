@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
-from datetime import datetime
 
 from contextweave.config import settings
 from contextweave.reasoning.prompts import QUERY_TYPE_PROMPTS, SYSTEM_PROMPT
@@ -76,8 +74,7 @@ class ReasoningEngine:
 
             answer = response.text
 
-            # Extract cited memory IDs from brackets
-            cited = list(set(re.findall(r"\[([^\]]+)\]", answer)))
+            # Unused: re.findall(r"\[([^\]]+)\]", answer) — citation parsing reserved
 
             # Estimate confidence from context coverage
             confidence = min(1.0, len(results) / 8 * 0.8 + 0.2)

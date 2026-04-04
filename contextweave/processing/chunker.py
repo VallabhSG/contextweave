@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import datetime
 
 from contextweave.config import settings
 from contextweave.schemas import Chunk, ContextEvent, SourceType
@@ -62,7 +61,7 @@ class SemanticChunker:
                 overlap = window[-self.overlap_sentences:] if self.overlap_sentences else []
                 window = overlap
                 window_start = max(0, i - len(overlap))
-                token_count = sum(self._estimate_tokens(l) for l in window)
+                token_count = sum(self._estimate_tokens(ln) for ln in window)
 
             window.append(line)
             token_count += line_tokens

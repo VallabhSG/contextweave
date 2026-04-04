@@ -8,7 +8,6 @@ import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
-from pathlib import Path
 
 from contextweave.config import settings
 from contextweave.schemas import Chunk, ContextEvent, Memory, SourceType
