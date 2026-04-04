@@ -4,14 +4,11 @@ from __future__ import annotations
 
 import logging
 import tempfile
-from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
-from contextweave.config import settings
-from contextweave.ingestion.browser_adapter import BrowserAdapter
 from contextweave.ingestion.calendar_adapter import CalendarAdapter
 from contextweave.ingestion.chat_adapter import ChatAdapter
 from contextweave.ingestion.text_adapter import TextAdapter
@@ -21,7 +18,7 @@ from contextweave.processing.entity_extractor import EntityExtractor
 from contextweave.processing.importance_scorer import ImportanceScorer
 from contextweave.reasoning.engine import ReasoningEngine
 from contextweave.retrieval.hybrid_retriever import HybridRetriever
-from contextweave.schemas import Memory, SourceType
+from contextweave.schemas import Memory
 from contextweave.storage.knowledge_graph import KnowledgeGraph
 from contextweave.storage.memory_store import MemoryStore
 from contextweave.storage.vector_store import VectorStore

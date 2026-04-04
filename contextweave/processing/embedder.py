@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from contextweave.config import settings
 from contextweave.schemas import Chunk
