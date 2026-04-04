@@ -5,6 +5,8 @@ import logging
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from contextweave.api.routes import router
 from contextweave.config import settings
@@ -29,16 +31,12 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.get("/")
 async def root():
-    return {
-        "name": "ContextWeave",
-        "version": "0.1.0",
-        "description": "Personal long-term memory & context engine",
-        "docs": "/docs",
-    }
+    return FileResponse("static/index.html")
 
 
 if __name__ == "__main__":
