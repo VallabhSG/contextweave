@@ -42,12 +42,17 @@ class HybridRetriever:
         """Execute hybrid retrieval and return ranked results."""
         final_k = top_k or settings.retrieval_final_k
 
-        # 1. Vector similarity search
-        query_embedding = self.embedder.embed_query(query)
-        vector_results = self.vector_store.query(
-            embedding=query_embedding,
-            top_k=settings.retrieval_top_k,
-        )
+        # 1. Vector similarity search (degrade gracefully if embedding fails or store empty)
+        vector_results = []
+        try:
+            if self.vector_store.count() > 0:
+                query_embedding = self.embedder.embed_query(query)
+                vector_results = self.vector_store.query(
+                    embedding=query_embedding,
+                    top_k=settings.retrieval_top_k,
+                )
+        except Exception as e:
+            logger.warning("Vector search skipped: %s", e)
 
         # 2. Full-text search
         fts_results = self.memory_store.search_fts(query, limit=settings.retrieval_top_k)
