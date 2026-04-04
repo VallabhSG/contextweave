@@ -90,6 +90,7 @@ class IngestResponse(BaseModel):
     events_created: int = 0
     chunks_created: int = 0
     entities_extracted: int = 0
+    vectors_stored: int = 0
     message: str = ""
 
 
@@ -213,13 +214,21 @@ async def _process_events(events) -> IngestResponse:
         store.save_memory(memory)
 
     # Store embeddings in vector store (with entity metadata attached)
-    vstore.add_chunks(processed_chunks)
+    vectors_stored = vstore.add_chunks(processed_chunks)
+
+    if vectors_stored == 0:
+        logger.warning(
+            "No vectors stored for %d chunks — Gemini embedding may be failing. "
+            "Check CW_GEMINI_API_KEY is set correctly on Render.",
+            len(processed_chunks),
+        )
 
     return IngestResponse(
         events_created=len(events),
         chunks_created=len(chunks),
         entities_extracted=total_entities,
-        message=f"Successfully ingested {len(events)} events into {len(chunks)} chunks",
+        vectors_stored=vectors_stored,
+        message=f"Ingested {len(events)} events into {len(chunks)} chunks ({vectors_stored} vectors stored)",
     )
 
 
@@ -341,6 +350,54 @@ async def get_entity(name: str):
             )
 
     return {"entity": entity.model_dump(), "connected_chunks": chunks}
+
+
+# ── Debug ───────────────────────────────────────────────────
+
+
+@router.get("/debug/gemini")
+async def debug_gemini():
+    """Test Gemini API connectivity. Useful for diagnosing key/quota issues."""
+    from contextweave.config import settings as cfg
+
+    key_set = bool(cfg.gemini_api_key)
+    key_preview = (cfg.gemini_api_key[:8] + "…") if key_set else "NOT SET"
+
+    embed_ok, embed_error = False, ""
+    gen_ok, gen_error = False, ""
+
+    if key_set:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=cfg.gemini_api_key)
+            result = genai.embed_content(
+                model=cfg.embedding_model,
+                content="test",
+                task_type="retrieval_document",
+            )
+            embed_ok = len(result["embedding"]) > 0
+        except Exception as e:
+            embed_error = str(e)
+
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=cfg.gemini_api_key)
+            model = genai.GenerativeModel(cfg.reasoning_model)
+            r = model.generate_content("Say OK", generation_config={"max_output_tokens": 5})
+            gen_ok = bool(r.text)
+        except Exception as e:
+            gen_error = str(e)
+
+    return {
+        "api_key_set": key_set,
+        "api_key_preview": key_preview,
+        "embedding_model": cfg.embedding_model,
+        "reasoning_model": cfg.reasoning_model,
+        "embedding_ok": embed_ok,
+        "embedding_error": embed_error,
+        "generation_ok": gen_ok,
+        "generation_error": gen_error,
+    }
 
 
 # ── Health ──────────────────────────────────────────────────
