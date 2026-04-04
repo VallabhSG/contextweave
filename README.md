@@ -13,11 +13,11 @@ A personal long-term memory and context reasoning engine. Ingests ambient contex
 
 Built to demonstrate the core technical challenge behind products like [Thine](https://thine.ai): not just storing context, but structuring it, scoring it with temporal decay, and reasoning across it to surface insights you didn't know to ask for.
 
-**Live API:** `https://contextweave.onrender.com` · [Interactive docs](https://contextweave.onrender.com/docs)
+**Live API:** `https://huggingface.co/spaces/Vallllllllll/contextweave` · [Interactive docs](https://huggingface.co/spaces/Vallllllllll/contextweave/docs)
 
 ```bash
 # Try it now (no auth required)
-curl https://contextweave.onrender.com/api/health
+curl https://huggingface.co/spaces/Vallllllllll/contextweave/api/health
 ```
 
 ---
@@ -31,7 +31,7 @@ curl https://contextweave.onrender.com/api/health
 │   Ingestion   │     Processing       │     Reasoning        │
 │               │                      │                      │
 │ TextAdapter   │ SemanticChunker      │ ReasoningEngine      │
-│ ChatAdapter   │ GeminiEmbedder       │   (Gemini Pro)       │
+│ ChatAdapter   │ fastembed       │   (Gemini Pro)       │
 │ BrowserAdapter│ EntityExtractor      │                      │
 │ CalendarAdapter│ ImportanceScorer    │ 6 Query Types:       │
 │               │  (temporal decay)    │  general, patterns,  │
@@ -77,7 +77,7 @@ Pluggable adapters normalize raw data into `ContextEvent` objects:
 - Prose: split on paragraph/section breaks, then sentences if needed
 - Configurable `max_tokens` (default: 512) and `overlap_sentences` (default: 2)
 
-**GeminiEmbedder** — Wraps `text-embedding-004` (768-dim vectors):
+**fastembed** — Wraps `text-embedding-004` (768-dim vectors):
 - Separate task types for document storage vs. query (better retrieval quality)
 - Batch processing with per-item fallback on failure
 
@@ -147,20 +147,20 @@ Six query types automatically detected from query keywords:
 
 ```bash
 # Health check
-curl https://contextweave.onrender.com/api/health
+curl https://huggingface.co/spaces/Vallllllllll/contextweave/api/health
 
 # Ingest a note
-curl -X POST https://contextweave.onrender.com/api/ingest/text \
+curl -X POST https://huggingface.co/spaces/Vallllllllll/contextweave/api/ingest/text \
   -H "Content-Type: application/json" \
   -d '{"content": "Met with Alice today about Project Alpha. We decided to prioritize the memory retrieval layer."}'
 
 # Query it
-curl -X POST https://contextweave.onrender.com/api/query \
+curl -X POST https://huggingface.co/spaces/Vallllllllll/contextweave/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "What did I decide about Project Alpha?"}'
 ```
 
-Interactive docs: [https://contextweave.onrender.com/docs](https://contextweave.onrender.com/docs)
+Interactive docs: [https://huggingface.co/spaces/Vallllllllll/contextweave/docs](https://huggingface.co/spaces/Vallllllllll/contextweave/docs)
 
 ### Run locally
 
@@ -174,10 +174,10 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Edit .env and set CW_GEMINI_API_KEY
+# Edit .env and set CW_GROQ_API_KEY
 ```
 
-Get a free Gemini API key at [aistudio.google.com](https://aistudio.google.com/app/apikey).
+Get a free Groq API key at console.groq.com.
 
 #### 3. Run
 
@@ -265,7 +265,7 @@ All settings use the `CW_` prefix as environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CW_GEMINI_API_KEY` | — | **Required.** Gemini API key |
+| `CW_GROQ_API_KEY` | — | **Required.** Gemini API key |
 | `CW_EMBEDDING_MODEL` | `models/text-embedding-004` | Embedding model |
 | `CW_REASONING_MODEL` | `models/gemini-2.0-flash` | LLM for reasoning |
 | `CW_DECAY_HALF_LIFE_DAYS` | `30.0` | Memory half-life in days |
@@ -295,12 +295,12 @@ Start with these easy-to-export personal data sources:
 | Layer | Technology |
 |-------|-----------|
 | API | FastAPI + Uvicorn |
-| Embeddings | Google `text-embedding-004` (768-dim) |
-| LLM Reasoning | Google `gemini-2.0-flash` |
+| Embeddings | fastembed BAAI/bge-small-en-v1.5 (384-dim, local) |
+| LLM Reasoning | Groq llama-3.1-8b-instant (free tier) |
 | Vector Store | ChromaDB (local, persistent) |
 | Relational + FTS | SQLite + FTS5 |
 | Knowledge Graph | NetworkX + SQLite |
 | Validation | Pydantic v2 |
 | Tests | pytest |
 
-**100% free to run.** No paid services required beyond a Gemini API key (free tier: 1,500 requests/day).
+**100% free to run.** No paid services required beyond a Groq API key (free tier: 14,400 req/day).
