@@ -21,18 +21,18 @@ QUERY_TYPE_HINTS = {
 
 
 class ReasoningEngine:
-    """Synthesizes answers from retrieved context using Gemini."""
+    """Synthesizes answers from retrieved context using Groq LLM."""
 
     def __init__(self, api_key: str | None = None):
-        self._api_key = api_key or settings.gemini_api_key
+        self._api_key = api_key or settings.groq_api_key
         self._model_name = settings.reasoning_model
-        self._model = None
+        self._client = None
 
     def _get_client(self):
-        if self._model is None:
-            from google import genai
-            self._model = genai.Client(api_key=self._api_key)
-        return self._model
+        if self._client is None:
+            from groq import Groq
+            self._client = Groq(api_key=self._api_key)
+        return self._client
 
     def reason(
         self,
@@ -48,36 +48,31 @@ class ReasoningEngine:
                 query_type=query_type or "general",
             )
 
-        # Auto-detect query type if not specified
         detected_type = query_type or self._detect_query_type(query)
+
+        if not self._api_key:
+            return self._fallback_response(query, results, detected_type)
+
         prompt_template = QUERY_TYPE_PROMPTS.get(detected_type, QUERY_TYPE_PROMPTS["general"])
-
-        # Format context
         context_str = self._format_context(results)
-
         prompt = prompt_template.format(context=context_str, query=query)
 
-        from google.genai import types
-        client = self._get_client()
         try:
-            response = client.models.generate_content(
+            client = self._get_client()
+            response = client.chat.completions.create(
                 model=self._model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_PROMPT,
-                    temperature=0.3,
-                    max_output_tokens=2048,
-                ),
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.3,
+                max_tokens=2048,
             )
 
-            answer = response.text
+            answer = response.choices[0].message.content
 
-            # Unused: re.findall(r"\[([^\]]+)\]", answer) — citation parsing reserved
-
-            # Estimate confidence from context coverage
             confidence = min(1.0, len(results) / 8 * 0.8 + 0.2)
 
-            # Extract pattern bullets if present
             patterns = []
             for line in answer.split("\n"):
                 line = line.strip()
@@ -94,11 +89,27 @@ class ReasoningEngine:
 
         except Exception as e:
             logger.error("Reasoning failed: %s", e)
-            return ReasoningResponse(
-                answer=f"Reasoning error: {e}. Retrieved {len(results)} relevant memories.",
-                confidence=0.0,
-                query_type=detected_type,
-            )
+            return self._fallback_response(query, results, detected_type)
+
+    def _fallback_response(
+        self,
+        query: str,
+        results: list[QueryResult],
+        query_type: str,
+    ) -> ReasoningResponse:
+        """Return structured context when LLM is unavailable."""
+        lines = [f"Found {len(results)} relevant memories for: **{query}**\n"]
+        for i, r in enumerate(results[:5], 1):
+            ts = r.timestamp.strftime("%Y-%m-%d")
+            lines.append(f"{i}. [{r.source.value} · {ts}] {r.content[:200]}…")
+
+        return ReasoningResponse(
+            answer="\n".join(lines),
+            cited_memories=[r.chunk_id for r in results[:5]],
+            confidence=min(1.0, len(results) / 8 * 0.6),
+            patterns=[],
+            query_type=query_type,
+        )
 
     def _detect_query_type(self, query: str) -> str:
         """Classify query into a reasoning type based on keyword hints."""

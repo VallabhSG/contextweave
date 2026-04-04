@@ -1,4 +1,4 @@
-"""Entity extraction using Gemini LLM for structured NER."""
+"""Entity extraction using Groq LLM for structured NER."""
 
 from __future__ import annotations
 
@@ -24,33 +24,36 @@ Return ONLY valid JSON array, no markdown fences or explanation."""
 
 
 class EntityExtractor:
-    """Extracts named entities from chunks using Gemini."""
+    """Extracts named entities from chunks using Groq LLM."""
 
     def __init__(self, api_key: str | None = None):
-        self._api_key = api_key or settings.gemini_api_key
+        self._api_key = api_key or settings.groq_api_key
         self._model_name = settings.extraction_model
-        self._model = None
+        self._client = None
 
     def _get_client(self):
-        if self._model is None:
-            from google import genai
-            self._model = genai.Client(api_key=self._api_key)
-        return self._model
+        if self._client is None:
+            from groq import Groq
+            self._client = Groq(api_key=self._api_key)
+        return self._client
 
     def extract_from_chunk(self, chunk: Chunk) -> list[Entity]:
         """Extract entities from a single chunk."""
-        from google.genai import types
-        client = self._get_client()
+        if not self._api_key:
+            return self._fallback_extract(chunk)
 
         try:
-            response = client.models.generate_content(
+            client = self._get_client()
+            response = client.chat.completions.create(
                 model=self._model_name,
-                contents=EXTRACTION_PROMPT.format(text=chunk.content[:2000]),
-                config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=1024),
+                messages=[
+                    {"role": "user", "content": EXTRACTION_PROMPT.format(text=chunk.content[:2000])}
+                ],
+                temperature=0.1,
+                max_tokens=1024,
             )
 
-            raw = response.text.strip()
-            # Strip markdown code fences if present
+            raw = response.choices[0].message.content.strip()
             raw = re.sub(r"^```(?:json)?\s*", "", raw)
             raw = re.sub(r"\s*```$", "", raw)
 
@@ -81,7 +84,7 @@ class EntityExtractor:
         return results
 
     def _fallback_extract(self, chunk: Chunk) -> list[Entity]:
-        """Simple regex-based fallback when LLM extraction fails."""
+        """Simple regex-based fallback when LLM extraction is unavailable."""
         entities = []
         now = chunk.timestamp
 
