@@ -1,6 +1,7 @@
 """ContextWeave — Personal Long-Term Memory & Context Engine."""
 
 import logging
+import os
 
 import uvicorn
 from fastapi import FastAPI
@@ -40,9 +41,10 @@ async def root():
 
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", settings.port))
     uvicorn.run(
         "main:app",
         host=settings.host,
-        port=settings.port,
+        port=port,
         reload=True,
     )
