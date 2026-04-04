@@ -314,7 +314,7 @@
     chunksEl.innerHTML = '<div class="entity-chunk muted">Loading…</div>';
     try {
       const data = await api.get(`/api/graph/entity/${encodeURIComponent(name)}`);
-      const chunks = data.chunks || [];
+      const chunks = data.connected_chunks || data.chunks || [];
       chunksEl.innerHTML = chunks.length
         ? chunks.map(c => `<div class="entity-chunk">${c.content?.slice(0, 220) || c.summary || '—'}<br><span class="muted" style="font-size:0.75rem">${relativeTime(c.timestamp)}</span></div>`).join('')
         : '<div class="entity-chunk muted">No connected chunks found.</div>';
