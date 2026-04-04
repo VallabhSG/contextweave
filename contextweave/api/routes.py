@@ -75,6 +75,8 @@ class QueryRequest(BaseModel):
     query_type: str | None = None
     top_k: int = 8
     source_filter: str | None = None
+    date_from: str | None = None  # ISO date e.g. "2024-01-01"
+    date_to: str | None = None    # ISO date e.g. "2024-12-31"
 
 
 class QueryResponse(BaseModel):
@@ -84,6 +86,8 @@ class QueryResponse(BaseModel):
     patterns: list[str] = []
     query_type: str = "general"
     context_count: int = 0
+    suggested_queries: list[str] = []
+    expanded_terms: list[str] = []
 
 
 class IngestResponse(BaseModel):
@@ -238,20 +242,42 @@ async def _process_events(events) -> IngestResponse:
 @router.post("/query", response_model=QueryResponse)
 async def query_memories(req: QueryRequest):
     """Natural language query against your memory."""
+    from datetime import datetime as dt
+
     retriever: HybridRetriever = _get("retriever")
     reasoning: ReasoningEngine = _get("reasoning")
+    store: MemoryStore = _get("memory_store")
+    graph: KnowledgeGraph = _get("knowledge_graph")
+
+    # Query expansion
+    expanded_terms = reasoning.expand_query(req.query)
+
+    # Parse optional date range
+    date_from = dt.fromisoformat(req.date_from) if req.date_from else None
+    date_to = dt.fromisoformat(req.date_to) if req.date_to else None
 
     results = retriever.retrieve(
         query=req.query,
         top_k=req.top_k,
         source_filter=req.source_filter,
+        date_from=date_from,
+        date_to=date_to,
+        extra_terms=expanded_terms,
     )
 
     response = reasoning.reason(
         query=req.query,
         results=results,
         query_type=req.query_type,
+        knowledge_graph=graph,
     )
+
+    # Record access for cited chunks
+    for chunk_id in response.cited_memories:
+        try:
+            store.record_chunk_access(chunk_id)
+        except Exception:
+            pass
 
     return QueryResponse(
         answer=response.answer,
@@ -260,6 +286,8 @@ async def query_memories(req: QueryRequest):
         patterns=response.patterns,
         query_type=response.query_type,
         context_count=len(results),
+        suggested_queries=response.suggested_queries,
+        expanded_terms=expanded_terms,
     )
 
 
@@ -293,6 +321,14 @@ async def list_memories(
         limit=limit,
         offset=offset,
     )
+    return {"memories": [m.model_dump() for m in memories], "count": len(memories)}
+
+
+@router.get("/memories/top/accessed")
+async def top_accessed_memories(limit: int = Query(default=20, le=100)):
+    """List most frequently accessed memories."""
+    store: MemoryStore = _get("memory_store")
+    memories = store.list_most_accessed(limit=limit)
     return {"memories": [m.model_dump() for m in memories], "count": len(memories)}
 
 

@@ -170,20 +170,27 @@
       .replace(/^(.+)$/, '<p>$1</p>');
   }
 
-  async function runQuery() {
-    const q = document.getElementById('query-input').value.trim();
+  async function runQuery(overrideQuery) {
+    const q = overrideQuery || document.getElementById('query-input').value.trim();
     if (!q) { toast('Enter a query first.', 'error'); return; }
+    if (overrideQuery) document.getElementById('query-input').value = overrideQuery;
     const btn = document.getElementById('btn-query');
     btn.disabled = true; btn.textContent = 'Thinking…';
     const card = document.getElementById('response-card');
     card.classList.add('hidden');
     try {
-      const res = await api.post('/api/query', { query: q, top_k: 8 });
+      const dateFrom = document.getElementById('date-from')?.value || null;
+      const dateTo = document.getElementById('date-to')?.value || null;
+      const res = await api.post('/api/query', {
+        query: q, top_k: 8,
+        date_from: dateFrom || null,
+        date_to: dateTo || null,
+      });
       const body = document.getElementById('response-body');
       body.innerHTML = renderMarkdown(res.answer || 'No answer returned.');
 
       document.getElementById('query-type-badge').textContent = res.query_type || 'general';
-      const cited = res.cited_chunks ? res.cited_chunks.length : (res.chunks_used || 0);
+      const cited = (res.cited_memories || []).length || res.context_count || 0;
       document.getElementById('cited-badge').textContent = `${cited} source${cited !== 1 ? 's' : ''}`;
 
       const conf = typeof res.confidence === 'number' ? res.confidence : 0.7;
@@ -199,6 +206,28 @@
         pill.textContent = p;
         pr.appendChild(pill);
       });
+
+      // Expanded terms
+      const et = document.getElementById('expanded-terms');
+      if (et) {
+        const terms = res.expanded_terms || [];
+        et.innerHTML = terms.length
+          ? `<span class="muted" style="font-size:.8rem">Also searched: </span>` +
+            terms.map(t => `<span class="entity-pill" style="font-size:.75rem;opacity:.7">${t}</span>`).join('')
+          : '';
+      }
+
+      // Suggested follow-up queries
+      const sq = document.getElementById('suggested-queries');
+      if (sq) {
+        const suggestions = res.suggested_queries || [];
+        sq.innerHTML = suggestions.length
+          ? `<div style="margin-top:1rem"><p class="muted" style="font-size:.8rem;margin-bottom:.4rem">Follow-up questions:</p>` +
+            suggestions.map(s =>
+              `<button class="btn-suggestion" onclick="runQuery(${JSON.stringify(s)})">${s}</button>`
+            ).join('') + '</div>'
+          : '';
+      }
 
       card.classList.remove('hidden');
     } catch (e) {
@@ -225,6 +254,10 @@
     const entities = (mem.entities || []).map(e =>
       `<span class="entity-pill" onclick="focusEntity('${e}')">${e}</span>`
     ).join('');
+    const accessCount = mem.access_count || 0;
+    const accessBadge = accessCount > 0
+      ? `<span class="access-badge" title="Recalled ${accessCount} time${accessCount !== 1 ? 's' : ''}">↩ ${accessCount}</span>`
+      : '';
     return `
       <div class="memory-card">
         <div class="memory-header">
@@ -237,6 +270,7 @@
         <div class="memory-footer">
           <span class="source-badge">${mem.source || 'unknown'}</span>
           ${entities}
+          ${accessBadge}
           <span class="time-label">${relativeTime(mem.timestamp)}</span>
         </div>
       </div>`;
@@ -268,6 +302,18 @@
   }
 
   // ── GRAPH ─────────────────────────────────────────────────────
+  const ENTITY_TYPE_COLORS = {
+    person: 'entity-type-person',
+    project: 'entity-type-project',
+    topic: 'entity-type-topic',
+    organization: 'entity-type-org',
+    org: 'entity-type-org',
+    place: 'entity-type-place',
+    location: 'entity-type-place',
+  };
+
+  let _loadedEntities = [];
+
   async function loadEntities() {
     const btn = document.getElementById('btn-load-entities');
     if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
@@ -275,19 +321,22 @@
       const data = await api.get('/api/graph/entities');
       const list = document.getElementById('entity-list');
       const entities = data.entities || data;
+      _loadedEntities = entities;
       if (!entities.length) {
         list.innerHTML = '<p class="muted" style="padding:20px 0">No entities yet. Ingest some text to extract entities.</p>';
         return;
       }
       list.innerHTML = '';
       entities.forEach(e => {
+        const rawType = (e.entity_type || e.type || 'entity').toLowerCase();
+        const colorClass = ENTITY_TYPE_COLORS[rawType] || '';
         const card = document.createElement('div');
         card.className = 'entity-card';
         card.id = `entity-${e.name.replace(/\s+/g, '-')}`;
         card.innerHTML = `
           <div class="entity-header" onclick="toggleEntity(this)">
             <span class="entity-name">${e.name}</span>
-            <span class="entity-type">${e.type || 'entity'}</span>
+            <span class="entity-type ${colorClass}">${rawType}</span>
             <span class="entity-count">${e.mention_count || 1}×</span>
             <span class="entity-chevron">▶</span>
           </div>
@@ -300,6 +349,33 @@
       if (btn) { btn.disabled = false; btn.textContent = 'Load Entities'; }
     }
   }
+
+  async function surpriseMe() {
+    if (!_loadedEntities.length) {
+      try {
+        const data = await api.get('/api/graph/entities?limit=50');
+        _loadedEntities = data.entities || [];
+      } catch {
+        toast('Load entities first.', 'error'); return;
+      }
+    }
+    if (!_loadedEntities.length) { toast('No entities yet — ingest some text first.', 'error'); return; }
+    const pick = _loadedEntities[Math.floor(Math.random() * _loadedEntities.length)];
+    const type = (pick.entity_type || pick.type || 'thing').toLowerCase();
+    const templates = {
+      person: [`What have I said or thought about ${pick.name}?`, `How does ${pick.name} connect to my current work?`],
+      project: [`What's the status and history of ${pick.name}?`, `What decisions have I made about ${pick.name}?`],
+      topic: [`What do I know about ${pick.name}?`, `How has my thinking on ${pick.name} evolved?`],
+      organization: [`What's my relationship with ${pick.name}?`, `What have I noted about ${pick.name}?`],
+      place: [`What do I associate with ${pick.name}?`, `What happened at or near ${pick.name}?`],
+    };
+    const options = templates[type] || [`Tell me everything about ${pick.name}.`, `What's the context around ${pick.name}?`];
+    const query = options[Math.floor(Math.random() * options.length)];
+    document.getElementById('section-query').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => runQuery(query), 400);
+  }
+
+  window.surpriseMe = surpriseMe;
 
   window.toggleEntity = async function (header) {
     const card = header.parentElement;
@@ -404,6 +480,9 @@
         runQuery();
       });
     });
+
+    const surpriseBtn = document.getElementById('btn-surprise-me');
+    if (surpriseBtn) surpriseBtn.addEventListener('click', surpriseMe);
 
     const health = await refreshHealth();
     setInterval(refreshHealth, 30000);
