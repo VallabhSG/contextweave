@@ -368,21 +368,22 @@ async def debug_gemini():
 
     if key_set:
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=cfg.gemini_api_key)
-            result = genai.embed_content(
-                model=cfg.embedding_model,
-                content="test",
-            )
-            embed_ok = len(result["embedding"]) > 0
+            from google import genai
+            client = genai.Client(api_key=cfg.gemini_api_key)
+            result = client.models.embed_content(model=cfg.embedding_model, contents="test")
+            embed_ok = len(result.embeddings[0].values) > 0
         except Exception as e:
             embed_error = str(e)
 
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=cfg.gemini_api_key)
-            model = genai.GenerativeModel(cfg.reasoning_model)
-            r = model.generate_content("Say OK", generation_config={"max_output_tokens": 5})
+            from google import genai
+            from google.genai import types
+            client = genai.Client(api_key=cfg.gemini_api_key)
+            r = client.models.generate_content(
+                model=cfg.reasoning_model,
+                contents="Say OK",
+                config=types.GenerateContentConfig(max_output_tokens=5),
+            )
             gen_ok = bool(r.text)
         except Exception as e:
             gen_error = str(e)

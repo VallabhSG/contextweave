@@ -31,22 +31,22 @@ class EntityExtractor:
         self._model_name = settings.extraction_model
         self._model = None
 
-    def _get_model(self):
+    def _get_client(self):
         if self._model is None:
-            import google.generativeai as genai
-
-            genai.configure(api_key=self._api_key)
-            self._model = genai.GenerativeModel(self._model_name)
+            from google import genai
+            self._model = genai.Client(api_key=self._api_key)
         return self._model
 
     def extract_from_chunk(self, chunk: Chunk) -> list[Entity]:
         """Extract entities from a single chunk."""
-        model = self._get_model()
+        from google.genai import types
+        client = self._get_client()
 
         try:
-            response = model.generate_content(
-                EXTRACTION_PROMPT.format(text=chunk.content[:2000]),
-                generation_config={"temperature": 0.1, "max_output_tokens": 1024},
+            response = client.models.generate_content(
+                model=self._model_name,
+                contents=EXTRACTION_PROMPT.format(text=chunk.content[:2000]),
+                config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=1024),
             )
 
             raw = response.text.strip()

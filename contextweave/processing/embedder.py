@@ -20,29 +20,19 @@ class GeminiEmbedder:
 
     def _get_client(self):
         if self._client is None:
-            import google.generativeai as genai
-
-            genai.configure(api_key=self._api_key)
-            self._client = genai
+            from google import genai
+            self._client = genai.Client(api_key=self._api_key)
         return self._client
 
     def embed_text(self, text: str) -> list[float]:
         """Embed a single text string."""
         client = self._get_client()
-        result = client.embed_content(
-            model=self._model,
-            content=text,
-        )
-        return result["embedding"]
+        result = client.models.embed_content(model=self._model, contents=text)
+        return result.embeddings[0].values
 
     def embed_query(self, query: str) -> list[float]:
         """Embed a query string."""
-        client = self._get_client()
-        result = client.embed_content(
-            model=self._model,
-            content=query,
-        )
-        return result["embedding"]
+        return self.embed_text(query)
 
     def embed_chunks(self, chunks: list[Chunk], batch_size: int = 50) -> list[Chunk]:
         """Embed a list of chunks in batches, returning new Chunk objects with embeddings."""
@@ -54,18 +44,12 @@ class GeminiEmbedder:
             texts = [c.content for c in batch]
 
             try:
-                result = client.embed_content(
-                    model=self._model,
-                    content=texts,
-                )
-                embeddings = result["embedding"]
-
-                for chunk, emb in zip(batch, embeddings):
-                    embedded.append(chunk.model_copy(update={"embedding": emb}))
+                result = client.models.embed_content(model=self._model, contents=texts)
+                for chunk, emb in zip(batch, result.embeddings):
+                    embedded.append(chunk.model_copy(update={"embedding": emb.values}))
 
             except Exception as e:
                 logger.error("Embedding batch %d failed: %s", i // batch_size, e)
-                # Fall back to individual embedding
                 for chunk in batch:
                     try:
                         emb = self.embed_text(chunk.content)
