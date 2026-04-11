@@ -26,7 +26,11 @@
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        throw new Error(err.detail || `${r.status}`);
+        const detail = err.detail;
+        const msg = Array.isArray(detail)
+          ? detail.map(d => d.msg || JSON.stringify(d)).join('; ')
+          : (typeof detail === 'string' ? detail : `${r.status} ${r.statusText}`);
+        throw new Error(msg);
       }
       return r.json();
     },
@@ -36,7 +40,11 @@
       const r = await fetch(BASE + path, { method: 'POST', body: fd });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        throw new Error(err.detail || `${r.status}`);
+        const detail = err.detail;
+        const msg = Array.isArray(detail)
+          ? detail.map(d => d.msg || JSON.stringify(d)).join('; ')
+          : (typeof detail === 'string' ? detail : `${r.status} ${r.statusText}`);
+        throw new Error(msg);
       }
       return r.json();
     },
@@ -458,7 +466,7 @@
 
     document.getElementById('btn-ingest-text').addEventListener('click', ingestText);
     document.getElementById('btn-ingest-file').addEventListener('click', ingestFile);
-    document.getElementById('btn-query').addEventListener('click', runQuery);
+    document.getElementById('btn-query').addEventListener('click', () => runQuery());
     document.getElementById('query-input').addEventListener('keydown', e => { if (e.key === 'Enter') runQuery(); });
     document.getElementById('btn-load-memories').addEventListener('click', () => loadMemories(true));
     document.getElementById('btn-load-more').addEventListener('click', () => loadMemories(false));
