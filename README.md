@@ -141,6 +141,36 @@ Six query types automatically detected from query keywords:
 
 ---
 
+## Product pillars (mapped to Thine)
+
+| Thine pillar | ContextWeave implementation |
+|---|---|
+| Everything connects | Knowledge graph + hybrid retrieval (vector 50% · FTS 30% · graph 20%) with temporal decay |
+| A companion that remembers | Events → chunks → scored memories, with access-frequency and connection boosts |
+| Proactive nudges | `GET /api/digest` — cached daily digest of focus, commitments, and slipping threads, surfaced automatically in the UI |
+| Ambient capture | 🎙 Listen button — live speech-to-text via the Web Speech API straight into ingestion |
+| Privacy: your data, your control | Private workspaces via `POST /api/auth/register` — isolated SQLite + vector collection per user, full `GET /api/export`, `DELETE /api/memory` |
+
+Without an API key you're in the **shared public demo space**. With one, every request routes to your own isolated workspace.
+
+```bash
+# Create a private space (the key is shown exactly once)
+curl -X POST https://vallllllllll-contextweave.hf.space/api/auth/register \
+  -H "Content-Type: application/json" -d '{"name": "me"}'
+
+# Use it on every call
+curl https://vallllllllll-contextweave.hf.space/api/me -H "X-API-Key: cw_..."
+
+# Your daily nudge
+curl https://vallllllllll-contextweave.hf.space/api/digest -H "X-API-Key: cw_..."
+
+# Take your data with you / erase it
+curl https://vallllllllll-contextweave.hf.space/api/export -H "X-API-Key: cw_..."
+curl -X DELETE https://vallllllllll-contextweave.hf.space/api/memory -H "X-API-Key: cw_..."
+```
+
+---
+
 ## Quickstart
 
 ### Try the live API

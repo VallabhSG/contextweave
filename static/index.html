@@ -19,6 +19,7 @@
       <a href="#section-ingest">Ingest</a>
       <a href="#section-query">Query</a>
       <a href="#section-memories">Memory</a>
+      <a href="#section-space">Space</a>
       <a href="/docs" target="_blank">API</a>
     </div>
   </nav>
@@ -44,6 +45,31 @@
     </div>
   </section>
 
+  <!-- NUDGE -->
+  <section class="section nudge-section hidden" id="section-nudge">
+    <div class="nudge-card">
+      <div class="nudge-top">
+        <p class="section-label"><span class="section-num">✦</span> Today's nudge</p>
+        <button class="btn-ghost" id="btn-refresh-nudge" title="Regenerate the nudge">↻ refresh</button>
+      </div>
+      <p class="nudge-headline" id="nudge-headline"></p>
+      <div class="nudge-cols">
+        <div class="nudge-col">
+          <p class="nudge-col-title">Focus</p>
+          <ul id="nudge-focus"></ul>
+        </div>
+        <div class="nudge-col">
+          <p class="nudge-col-title">Commitments</p>
+          <ul id="nudge-commitments"></ul>
+        </div>
+        <div class="nudge-col nudge-gaps">
+          <p class="nudge-col-title">Slipping</p>
+          <ul id="nudge-gaps"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <hr class="divider" />
 
   <!-- INGEST -->
@@ -63,8 +89,11 @@
           <option value="conversation">Conversation</option>
           <option value="journal">Journal</option>
         </select>
-        <textarea id="ingest-text" class="textarea" placeholder="Paste meeting notes, a journal entry, a conversation, or any text…" rows="6"></textarea>
-        <button class="btn btn-primary" id="btn-ingest-text">Ingest text</button>
+        <textarea id="ingest-text" class="textarea" placeholder="Paste meeting notes, a journal entry, a conversation — or press Listen and just talk…" rows="6"></textarea>
+        <div class="ingest-actions">
+          <button class="btn btn-primary" id="btn-ingest-text">Ingest text</button>
+          <button class="btn btn-secondary mic-btn" id="btn-mic" title="Ambient voice capture — speak, and it transcribes live">🎙 Listen</button>
+        </div>
       </div>
 
       <div class="card">
@@ -182,6 +211,33 @@
 
   <hr class="divider" />
 
+  <!-- PRIVATE SPACE -->
+  <section class="section fade-in" id="section-space">
+    <p class="section-label"><span class="section-num">05</span> Your space</p>
+    <h2 class="section-title">Your data,<br><em>your control.</em></h2>
+    <p class="section-desc">
+      By default you're in the shared public demo space. Create a private space to get an API key — your memories become yours alone, exportable and erasable at any time.
+    </p>
+    <div class="space-panel">
+      <p class="space-status" id="space-status">Public demo space</p>
+      <div class="space-actions">
+        <button class="btn btn-primary" id="btn-create-space">Create private space</button>
+        <input type="text" id="key-input" class="query-input key-input" placeholder="cw_… paste an existing key" />
+        <button class="btn btn-secondary" id="btn-use-key">Use key</button>
+        <button class="btn btn-secondary hidden" id="btn-leave-space">Leave space</button>
+        <button class="btn btn-secondary" id="btn-export">Export JSON</button>
+        <button class="btn btn-danger hidden" id="btn-wipe">Wipe memory</button>
+      </div>
+      <div class="key-reveal hidden" id="key-reveal">
+        <p>Your API key — <strong>shown once, store it now</strong>:</p>
+        <code id="key-value"></code>
+        <button class="btn-ghost" id="btn-copy-key">copy</button>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
   <!-- FOOTER -->
   <footer class="footer">
     <div class="footer-left">
@@ -198,6 +254,7 @@
   </footer>
 
   <div class="toast-container" id="toast-container"></div>
+  <script src="/static/capture.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

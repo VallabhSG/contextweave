@@ -12,16 +12,23 @@
   };
 
   // ── API ──────────────────────────────────────────────────────
+  // A stored key routes every call to the caller's private workspace;
+  // without one the server serves the shared demo space.
+  function authHeaders() {
+    const k = localStorage.getItem('cw_api_key');
+    return k ? { 'X-API-Key': k } : {};
+  }
+
   const api = {
     async get(path) {
-      const r = await fetch(BASE + path);
+      const r = await fetch(BASE + path, { headers: authHeaders() });
       if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
       return r.json();
     },
     async post(path, body) {
       const r = await fetch(BASE + path, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(body),
       });
       if (!r.ok) {
@@ -37,7 +44,7 @@
     async upload(path, file) {
       const fd = new FormData();
       fd.append('file', file);
-      const r = await fetch(BASE + path, { method: 'POST', body: fd });
+      const r = await fetch(BASE + path, { method: 'POST', headers: authHeaders(), body: fd });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
         const detail = err.detail;
@@ -106,6 +113,42 @@
       dot.className = 'live-dot error';
       lbl.textContent = 'unreachable';
       return null;
+    }
+  }
+
+  // ── NUDGE (proactive digest) ─────────────────────────────────
+  function fillList(id, items, emptyText) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = '';
+    const list = items && items.length ? items : null;
+    if (!list) {
+      const li = document.createElement('li');
+      li.className = 'muted';
+      li.textContent = emptyText;
+      el.appendChild(li);
+      return;
+    }
+    list.forEach(text => {
+      const li = document.createElement('li');
+      li.textContent = text;
+      el.appendChild(li);
+    });
+  }
+
+  async function loadDigest(force = false) {
+    const section = document.getElementById('section-nudge');
+    if (!section) return;
+    try {
+      const d = await api.get('/api/digest' + (force ? '?force=true' : ''));
+      if (!d.memory_count) { section.classList.add('hidden'); return; }
+      document.getElementById('nudge-headline').textContent = d.headline || '';
+      fillList('nudge-focus', d.focus, 'Nothing surfaced yet');
+      fillList('nudge-commitments', d.commitments, 'No open commitments');
+      fillList('nudge-gaps', d.gaps, 'Nothing slipping');
+      section.classList.remove('hidden');
+    } catch {
+      section.classList.add('hidden');
     }
   }
 
@@ -477,6 +520,114 @@
     }
   }
 
+  // ── PRIVATE SPACE ────────────────────────────────────────────
+  function spaceStatusRefresh() {
+    const hasKey = !!localStorage.getItem('cw_api_key');
+    document.getElementById('space-status').textContent = hasKey
+      ? 'Private space active — memories here are yours alone.'
+      : 'Public demo space — anything you ingest is visible to other visitors.';
+    document.getElementById('btn-wipe').classList.toggle('hidden', !hasKey);
+    document.getElementById('btn-leave-space').classList.toggle('hidden', !hasKey);
+    document.getElementById('btn-create-space').classList.toggle('hidden', hasKey);
+  }
+
+  async function refreshAll() {
+    const health = await refreshHealth();
+    memoriesOffset = 0;
+    document.getElementById('memories-grid').innerHTML = '';
+    document.getElementById('entity-list').innerHTML = '';
+    _loadedEntities = [];
+
+    if (health && health.memories > 0) {
+      loadMemories(true);
+      loadDigest();
+    } else {
+      const nudge = document.getElementById('section-nudge');
+      if (nudge) nudge.classList.add('hidden');
+    }
+    if (health && health.entities > 0) loadEntities();
+    document.getElementById('btn-load-entities')
+      .classList.toggle('hidden', !!(health && health.entities > 0));
+    return health;
+  }
+
+  function initSpace() {
+    spaceStatusRefresh();
+
+    document.getElementById('btn-create-space').addEventListener('click', async () => {
+      try {
+        const res = await api.post('/api/auth/register', {});
+        localStorage.setItem('cw_api_key', res.api_key);
+        document.getElementById('key-value').textContent = res.api_key;
+        document.getElementById('key-reveal').classList.remove('hidden');
+        spaceStatusRefresh();
+        toast('Private space created — copy your key somewhere safe, it is shown once.', 'success', 7000);
+        await refreshAll();
+      } catch (e) {
+        toast(`Could not create space: ${e.message}`, 'error');
+      }
+    });
+
+    document.getElementById('btn-copy-key').addEventListener('click', () => {
+      const key = document.getElementById('key-value').textContent;
+      navigator.clipboard.writeText(key)
+        .then(() => toast('Key copied.', 'success'))
+        .catch(() => toast('Copy failed — select the key manually.', 'error'));
+    });
+
+    document.getElementById('btn-use-key').addEventListener('click', async () => {
+      const key = document.getElementById('key-input').value.trim();
+      if (!key) { toast('Paste a key first.', 'error'); return; }
+      const r = await fetch(BASE + '/api/me', { headers: { 'X-API-Key': key } });
+      if (!r.ok) { toast('Invalid key.', 'error'); return; }
+      localStorage.setItem('cw_api_key', key);
+      document.getElementById('key-input').value = '';
+      spaceStatusRefresh();
+      toast('Private space activated.', 'success');
+      await refreshAll();
+    });
+
+    document.getElementById('btn-leave-space').addEventListener('click', async () => {
+      localStorage.removeItem('cw_api_key');
+      document.getElementById('key-reveal').classList.add('hidden');
+      spaceStatusRefresh();
+      toast('Back in the public demo space.', 'info');
+      await refreshAll();
+    });
+
+    document.getElementById('btn-export').addEventListener('click', async () => {
+      try {
+        const data = await api.get('/api/export');
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'contextweave-export.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        toast('Export downloaded.', 'success');
+      } catch (e) {
+        toast(`Export failed: ${e.message}`, 'error');
+      }
+    });
+
+    document.getElementById('btn-wipe').addEventListener('click', async () => {
+      if (!window.confirm('Erase ALL memories in your private space? This cannot be undone.')) return;
+      try {
+        const r = await fetch(BASE + '/api/memory', { method: 'DELETE', headers: authHeaders() });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.detail || r.statusText);
+        }
+        toast('Memory wiped.', 'success');
+        await refreshAll();
+      } catch (e) {
+        toast(`Wipe failed: ${e.message}`, 'error');
+      }
+    });
+
+    document.getElementById('btn-refresh-nudge').addEventListener('click', () => loadDigest(true));
+  }
+
   // ── INIT ─────────────────────────────────────────────────────
   function setupNav() {
     const nav = document.getElementById('nav');
@@ -530,16 +681,19 @@
     const surpriseBtn = document.getElementById('btn-surprise-me');
     if (surpriseBtn) surpriseBtn.addEventListener('click', surpriseMe);
 
-    const health = await refreshHealth();
-    setInterval(refreshHealth, 30000);
+    document.getElementById('btn-load-entities').addEventListener('click', loadEntities);
 
-    // Auto-load memories and entities if data exists
-    if (health && health.memories > 0) loadMemories(true);
-    if (health && health.entities > 0) loadEntities();
-    else {
-      document.getElementById('btn-load-entities').classList.remove('hidden');
-      document.getElementById('btn-load-entities').addEventListener('click', loadEntities);
+    initSpace();
+    if (window.CWCapture) {
+      window.CWCapture.init(
+        document.getElementById('btn-mic'),
+        document.getElementById('ingest-text'),
+        document.getElementById('source-select')
+      );
     }
+
+    setInterval(refreshHealth, 30000);
+    await refreshAll();
   }
 
   document.addEventListener('DOMContentLoaded', init);
