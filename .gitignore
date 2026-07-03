@@ -7,6 +7,7 @@ build/
 .eggs/
 *.egg
 .env
+.env.local
 .venv/
 venv/
 env/
@@ -19,3 +20,5 @@ data/
 .mypy_cache/
 .ruff_cache/
 .claude
+node_modules/
+.expo/
