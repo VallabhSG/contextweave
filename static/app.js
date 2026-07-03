@@ -50,6 +50,18 @@
     },
   };
 
+  // ── HTML ESCAPING ────────────────────────────────────────────
+  // All ingested content is user-controlled; anything rendered via
+  // innerHTML must pass through here to prevent stored XSS.
+  function esc(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   // ── TOAST ────────────────────────────────────────────────────
   function toast(msg, type = 'info', duration = 3500) {
     const c = document.getElementById('toast-container');
@@ -121,7 +133,10 @@
     const btn = document.getElementById('btn-ingest-text');
     btn.disabled = true; btn.textContent = 'Ingesting…';
     try {
-      const res = await api.post('/api/ingest/text', { content });
+      const body = { content };
+      const sourceSel = document.getElementById('source-select');
+      if (sourceSel && sourceSel.value) body.source = sourceSel.value;
+      const res = await api.post('/api/ingest/text', body);
       animatePipeline();
       toast(`✓ ${res.chunks_created} chunk${res.chunks_created !== 1 ? 's' : ''}, ${res.entities_extracted} entities extracted`, 'success');
       document.getElementById('ingest-text').value = '';
@@ -130,7 +145,7 @@
     } catch (e) {
       toast(`Ingest failed: ${e.message}`, 'error');
     } finally {
-      btn.disabled = false; btn.textContent = 'Ingest Text';
+      btn.disabled = false; btn.textContent = 'Ingest text';
     }
   }
 
@@ -146,11 +161,11 @@
       toast(`✓ ${res.chunks_created} chunks, ${res.entities_extracted} entities`, 'success');
       input.value = '';
       document.getElementById('file-name').textContent = '';
-      btn.disabled = true; btn.textContent = 'Upload File';
+      btn.disabled = true; btn.textContent = 'Upload file';
       await refreshHealth();
     } catch (e) {
       toast(`Upload failed: ${e.message}`, 'error');
-      btn.disabled = false; btn.textContent = 'Upload File';
+      btn.disabled = false; btn.textContent = 'Upload file';
     }
   }
 
@@ -168,7 +183,7 @@
 
   // ── QUERY ─────────────────────────────────────────────────────
   function renderMarkdown(text) {
-    return text
+    return esc(text)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/`(.+?)`/g, '<code>$1</code>')
@@ -221,20 +236,33 @@
         const terms = res.expanded_terms || [];
         et.innerHTML = terms.length
           ? `<span class="muted" style="font-size:.8rem">Also searched: </span>` +
-            terms.map(t => `<span class="entity-pill" style="font-size:.75rem;opacity:.7">${t}</span>`).join('')
+            terms.map(t => `<span class="entity-pill" style="font-size:.75rem;opacity:.7">${esc(t)}</span>`).join('')
           : '';
       }
 
-      // Suggested follow-up queries
+      // Suggested follow-up queries (DOM-built: inline onclick can't reach
+      // the IIFE-scoped runQuery, and raw interpolation would be injectable)
       const sq = document.getElementById('suggested-queries');
       if (sq) {
+        sq.innerHTML = '';
         const suggestions = res.suggested_queries || [];
-        sq.innerHTML = suggestions.length
-          ? `<div style="margin-top:1rem"><p class="muted" style="font-size:.8rem;margin-bottom:.4rem">Follow-up questions:</p>` +
-            suggestions.map(s =>
-              `<button class="btn-suggestion" onclick="runQuery(${JSON.stringify(s)})">${s}</button>`
-            ).join('') + '</div>'
-          : '';
+        if (suggestions.length) {
+          const wrap = document.createElement('div');
+          wrap.style.marginTop = '1rem';
+          const label = document.createElement('p');
+          label.className = 'muted';
+          label.style.cssText = 'font-size:.8rem;margin-bottom:.4rem';
+          label.textContent = 'Follow-up questions:';
+          wrap.appendChild(label);
+          suggestions.forEach(s => {
+            const b = document.createElement('button');
+            b.className = 'btn-suggestion';
+            b.textContent = s;
+            b.addEventListener('click', () => runQuery(s));
+            wrap.appendChild(b);
+          });
+          sq.appendChild(wrap);
+        }
       }
 
       card.classList.remove('hidden');
@@ -260,7 +288,7 @@
     const imp = (mem.importance || 0).toFixed(2);
     const pct = Math.round((mem.importance || 0) * 100);
     const entities = (mem.entities || []).map(e =>
-      `<span class="entity-pill" onclick="focusEntity('${e}')">${e}</span>`
+      `<span class="entity-pill" data-entity="${esc(e)}">${esc(e)}</span>`
     ).join('');
     const accessCount = mem.access_count || 0;
     const accessBadge = accessCount > 0
@@ -269,14 +297,14 @@
     return `
       <div class="memory-card">
         <div class="memory-header">
-          <div class="memory-summary">${mem.summary || mem.content?.slice(0, 200) || '—'}</div>
+          <div class="memory-summary">${esc(mem.summary || mem.content?.slice(0, 200) || '—')}</div>
           <div class="importance-wrap">
             <span class="importance-score">${imp}</span>
             <div class="importance-bar-wrap"><div class="importance-bar-fill" style="width:${pct}%"></div></div>
           </div>
         </div>
         <div class="memory-footer">
-          <span class="source-badge">${mem.source || 'unknown'}</span>
+          <span class="source-badge">${esc(mem.source || 'unknown')}</span>
           ${entities}
           ${accessBadge}
           <span class="time-label">${relativeTime(mem.timestamp)}</span>
@@ -305,7 +333,7 @@
     } catch (e) {
       toast(`Could not load memories: ${e.message}`, 'error');
     } finally {
-      btn.disabled = false; btn.textContent = 'Load Memories';
+      btn.disabled = false; btn.textContent = 'Load memories';
     }
   }
 
@@ -342,19 +370,19 @@
         card.className = 'entity-card';
         card.id = `entity-${e.name.replace(/\s+/g, '-')}`;
         card.innerHTML = `
-          <div class="entity-header" onclick="toggleEntity(this)">
-            <span class="entity-name">${e.name}</span>
-            <span class="entity-type ${colorClass}">${rawType}</span>
+          <div class="entity-header">
+            <span class="entity-name">${esc(e.name)}</span>
+            <span class="entity-type ${colorClass}">${esc(rawType)}</span>
             <span class="entity-count">${e.mention_count || 1}×</span>
             <span class="entity-chevron">▶</span>
           </div>
-          <div class="entity-chunks" id="chunks-${e.name.replace(/\s+/g, '-')}"></div>`;
+          <div class="entity-chunks" id="chunks-${esc(e.name.replace(/\s+/g, '-'))}"></div>`;
         list.appendChild(card);
       });
     } catch (e) {
       toast(`Could not load entities: ${e.message}`, 'error');
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Load Entities'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Load entities'; }
     }
   }
 
@@ -383,9 +411,7 @@
     setTimeout(() => runQuery(query), 400);
   }
 
-  window.surpriseMe = surpriseMe;
-
-  window.toggleEntity = async function (header) {
+  async function toggleEntity(header) {
     const card = header.parentElement;
     const name = card.querySelector('.entity-name').textContent;
     const chunksEl = document.getElementById(`chunks-${name.replace(/\s+/g, '-')}`);
@@ -400,14 +426,14 @@
       const data = await api.get(`/api/graph/entity/${encodeURIComponent(name)}`);
       const chunks = data.connected_chunks || data.chunks || [];
       chunksEl.innerHTML = chunks.length
-        ? chunks.map(c => `<div class="entity-chunk">${c.content?.slice(0, 220) || c.summary || '—'}<br><span class="muted" style="font-size:0.75rem">${relativeTime(c.timestamp)}</span></div>`).join('')
+        ? chunks.map(c => `<div class="entity-chunk">${esc(c.content?.slice(0, 220) || c.summary || '—')}<br><span class="muted" style="font-size:0.75rem">${relativeTime(c.timestamp)}</span></div>`).join('')
         : '<div class="entity-chunk muted">No connected chunks found.</div>';
     } catch {
       chunksEl.innerHTML = '<div class="entity-chunk muted">Could not load chunks.</div>';
     }
-  };
+  }
 
-  window.focusEntity = function (name) {
+  function focusEntity(name) {
     const id = `entity-${name.replace(/\s+/g, '-')}`;
     const el = document.getElementById(id);
     if (el) {
@@ -417,7 +443,7 @@
     } else {
       document.getElementById('section-graph').scrollIntoView({ behavior: 'smooth' });
     }
-  };
+  }
 
   // ── FADE-IN OBSERVER ─────────────────────────────────────────
   function setupFadeIn() {
@@ -470,6 +496,18 @@
     document.getElementById('query-input').addEventListener('keydown', e => { if (e.key === 'Enter') runQuery(); });
     document.getElementById('btn-load-memories').addEventListener('click', () => loadMemories(true));
     document.getElementById('btn-load-more').addEventListener('click', () => loadMemories(false));
+
+    // Entity pills inside memory cards (delegated — cards are re-rendered)
+    document.getElementById('memories-grid').addEventListener('click', e => {
+      const pill = e.target.closest('.entity-pill');
+      if (pill && pill.dataset.entity) focusEntity(pill.dataset.entity);
+    });
+
+    // Entity card headers (delegated — no inline handlers, CSP-safe)
+    document.getElementById('entity-list').addEventListener('click', e => {
+      const header = e.target.closest('.entity-header');
+      if (header) toggleEntity(header);
+    });
 
     document.getElementById('importance-slider').addEventListener('input', function () {
       document.getElementById('importance-val').textContent = parseFloat(this.value).toFixed(2);
