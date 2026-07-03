@@ -3,7 +3,7 @@
 import httpx
 import time
 
-BASE = "https://huggingface.co/spaces/Vallllllllll/contextweave"
+BASE = "https://vallllllllll-contextweave.hf.space"
 
 ENTRIES = [
     # ── MEETINGS ────────────────────────────────────────────────
@@ -345,7 +345,7 @@ def main():
         success = ingest(entry, i)
         if success:
             ok += 1
-        time.sleep(1.2)  # stay within Gemini free-tier rate limits
+        time.sleep(1.2)  # stay within Groq free-tier rate limits
 
     print(f"\nDone — {ok}/{len(ENTRIES)} entries ingested successfully.")
 

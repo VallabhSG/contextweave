@@ -11,13 +11,13 @@ pinned: true
 
 A personal long-term memory and context reasoning engine. Ingests ambient context from conversations, notes, browser history, and calendar events — then lets you query patterns and answers across your entire life data stream.
 
-Built to demonstrate the core technical challenge behind products like [Thine](https://thine.ai): not just storing context, but structuring it, scoring it with temporal decay, and reasoning across it to surface insights you didn't know to ask for.
+Built to demonstrate the core technical challenge behind products like [Thine](https://www.thine.com/): not just storing context, but structuring it, scoring it with temporal decay, and reasoning across it to surface insights you didn't know to ask for.
 
-**Live API:** `https://huggingface.co/spaces/Vallllllllll/contextweave` · [Interactive docs](https://huggingface.co/spaces/Vallllllllll/contextweave/docs)
+**Live demo:** [vallllllllll-contextweave.hf.space](https://vallllllllll-contextweave.hf.space) · [Interactive docs](https://vallllllllll-contextweave.hf.space/docs) · [Space page](https://huggingface.co/spaces/Vallllllllll/contextweave)
 
 ```bash
 # Try it now (no auth required)
-curl https://huggingface.co/spaces/Vallllllllll/contextweave/api/health
+curl https://vallllllllll-contextweave.hf.space/api/health
 ```
 
 ---
@@ -31,7 +31,7 @@ curl https://huggingface.co/spaces/Vallllllllll/contextweave/api/health
 │   Ingestion   │     Processing       │     Reasoning        │
 │               │                      │                      │
 │ TextAdapter   │ SemanticChunker      │ ReasoningEngine      │
-│ ChatAdapter   │ fastembed       │   (Gemini Pro)       │
+│ ChatAdapter   │ LocalEmbedder        │   (Groq Llama)       │
 │ BrowserAdapter│ EntityExtractor      │                      │
 │ CalendarAdapter│ ImportanceScorer    │ 6 Query Types:       │
 │               │  (temporal decay)    │  general, patterns,  │
@@ -77,11 +77,11 @@ Pluggable adapters normalize raw data into `ContextEvent` objects:
 - Prose: split on paragraph/section breaks, then sentences if needed
 - Configurable `max_tokens` (default: 512) and `overlap_sentences` (default: 2)
 
-**fastembed** — Wraps `text-embedding-004` (768-dim vectors):
-- Separate task types for document storage vs. query (better retrieval quality)
+**LocalEmbedder** — fastembed with `BAAI/bge-small-en-v1.5` (384-dim vectors):
+- Runs fully locally — no API key or network call needed for embeddings
 - Batch processing with per-item fallback on failure
 
-**EntityExtractor** — LLM-based NER via Gemini:
+**EntityExtractor** — LLM-based NER via Groq (`llama-3.1-8b-instant`):
 - Extracts: person, place, project, topic, organization, event
 - Fallback regex NER when LLM fails
 
@@ -147,20 +147,20 @@ Six query types automatically detected from query keywords:
 
 ```bash
 # Health check
-curl https://huggingface.co/spaces/Vallllllllll/contextweave/api/health
+curl https://vallllllllll-contextweave.hf.space/api/health
 
 # Ingest a note
-curl -X POST https://huggingface.co/spaces/Vallllllllll/contextweave/api/ingest/text \
+curl -X POST https://vallllllllll-contextweave.hf.space/api/ingest/text \
   -H "Content-Type: application/json" \
   -d '{"content": "Met with Alice today about Project Alpha. We decided to prioritize the memory retrieval layer."}'
 
 # Query it
-curl -X POST https://huggingface.co/spaces/Vallllllllll/contextweave/api/query \
+curl -X POST https://vallllllllll-contextweave.hf.space/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "What did I decide about Project Alpha?"}'
 ```
 
-Interactive docs: [https://huggingface.co/spaces/Vallllllllll/contextweave/docs](https://huggingface.co/spaces/Vallllllllll/contextweave/docs)
+Interactive docs: [https://vallllllllll-contextweave.hf.space/docs](https://vallllllllll-contextweave.hf.space/docs)
 
 ### Run locally
 
@@ -265,9 +265,10 @@ All settings use the `CW_` prefix as environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CW_GROQ_API_KEY` | — | **Required.** Gemini API key |
-| `CW_EMBEDDING_MODEL` | `models/text-embedding-004` | Embedding model |
-| `CW_REASONING_MODEL` | `models/gemini-2.0-flash` | LLM for reasoning |
+| `CW_GROQ_API_KEY` | — | **Required.** Groq API key |
+| `CW_EMBEDDING_MODEL` | `BAAI/bge-small-en-v1.5` | Local fastembed model |
+| `CW_REASONING_MODEL` | `llama-3.1-8b-instant` | Groq LLM for reasoning |
+| `CW_EXTRACTION_MODEL` | `llama-3.1-8b-instant` | Groq LLM for entity extraction |
 | `CW_DECAY_HALF_LIFE_DAYS` | `30.0` | Memory half-life in days |
 | `CW_RETRIEVAL_FINAL_K` | `8` | Max results returned |
 | `CW_RETRIEVAL_TOP_K` | `20` | Candidates per retrieval signal |
