@@ -8,6 +8,7 @@ from pathlib import Path
 
 from contextweave.ingestion.base import BaseAdapter
 from contextweave.schemas import ContextEvent, SourceType
+from contextweave.timeutils import utcnow
 
 
 class BrowserAdapter(BaseAdapter):
@@ -79,7 +80,7 @@ class BrowserAdapter(BaseAdapter):
     def _parse_browser_ts(raw) -> datetime:
         """Parse Chrome's microsecond timestamps or standard formats."""
         if not raw:
-            return datetime.utcnow()
+            return utcnow()
 
         try:
             usec = int(raw)
@@ -93,7 +94,7 @@ class BrowserAdapter(BaseAdapter):
         except (ValueError, OSError):
             pass
 
-        return datetime.utcnow()
+        return utcnow()
 
     @staticmethod
     def _extract_domain(url: str) -> str:

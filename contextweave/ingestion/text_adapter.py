@@ -8,6 +8,7 @@ from pathlib import Path
 
 from contextweave.ingestion.base import BaseAdapter
 from contextweave.schemas import ContextEvent, SourceType
+from contextweave.timeutils import utcnow
 
 
 class TextAdapter(BaseAdapter):
@@ -37,12 +38,13 @@ class TextAdapter(BaseAdapter):
         raw: str,
         metadata: dict | None = None,
         timestamp: datetime | None = None,
+        source: SourceType = SourceType.NOTE,
     ) -> list[ContextEvent]:
         if not raw.strip():
             return []
 
         meta = metadata or {}
-        ts = timestamp or datetime.utcnow()
+        ts = timestamp or utcnow()
 
         # Split markdown by H1/H2 headings into logical sections
         sections = self._split_sections(raw)
@@ -53,7 +55,7 @@ class TextAdapter(BaseAdapter):
                 continue
             events.append(
                 ContextEvent(
-                    source=SourceType.NOTE,
+                    source=source,
                     content=section["content"],
                     timestamp=ts,
                     metadata={**meta, "heading": section.get("heading", "")},
@@ -66,7 +68,7 @@ class TextAdapter(BaseAdapter):
             if events
             else [
                 ContextEvent(
-                    source=SourceType.NOTE,
+                    source=source,
                     content=raw,
                     timestamp=ts,
                     metadata=meta,

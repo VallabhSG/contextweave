@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from datetime import datetime
 
+from contextweave.timeutils import utcnow
+
 
 class ImportanceScorer:
     """Scores memories using temporal decay, access frequency, and connection density.
@@ -36,7 +38,7 @@ class ImportanceScorer:
         now: datetime | None = None,
     ) -> float:
         """Calculate the current importance score for a memory."""
-        now = now or datetime.utcnow()
+        now = now or utcnow()
 
         recency = self._recency_decay(timestamp, now)
         access = self._access_boost(access_count)

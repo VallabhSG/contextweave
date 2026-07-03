@@ -9,6 +9,7 @@ from pathlib import Path
 
 from contextweave.ingestion.base import BaseAdapter
 from contextweave.schemas import ContextEvent, SourceType
+from contextweave.timeutils import utcnow
 
 
 class ChatAdapter(BaseAdapter):
@@ -108,7 +109,7 @@ class ChatAdapter(BaseAdapter):
     def _parse_timestamp(raw: str) -> datetime:
         """Best-effort timestamp parsing."""
         if not raw:
-            return datetime.utcnow()
+            return utcnow()
 
         # Handle Unix timestamps
         try:
@@ -135,4 +136,4 @@ class ChatAdapter(BaseAdapter):
             except ValueError:
                 continue
 
-        return datetime.utcnow()
+        return utcnow()

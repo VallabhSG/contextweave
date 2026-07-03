@@ -11,6 +11,7 @@ from datetime import datetime
 
 from contextweave.config import settings
 from contextweave.schemas import Chunk, ContextEvent, Memory, SourceType
+from contextweave.timeutils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +125,10 @@ class MemoryStore:
                     json.dumps(chunk.metadata),
                 ),
             )
-            # Update FTS index
+            # Update FTS index (FTS5 has no PK, so OR REPLACE never replaces — delete first)
+            conn.execute("DELETE FROM chunks_fts WHERE id = ?", (chunk.id,))
             conn.execute(
-                "INSERT OR REPLACE INTO chunks_fts (id, content, entities) VALUES (?, ?, ?)",
+                "INSERT INTO chunks_fts (id, content, entities) VALUES (?, ?, ?)",
                 (chunk.id, chunk.content, " ".join(chunk.entities)),
             )
 
@@ -226,7 +228,7 @@ class MemoryStore:
         with self._conn() as conn:
             conn.execute(
                 "UPDATE memories SET access_count = access_count + 1, last_accessed = ? WHERE id = ?",
-                (datetime.utcnow().isoformat(), memory_id),
+                (utcnow().isoformat(), memory_id),
             )
 
     def record_chunk_access(self, chunk_id: str) -> None:
@@ -234,7 +236,7 @@ class MemoryStore:
         with self._conn() as conn:
             conn.execute(
                 "UPDATE memories SET access_count = access_count + 1, last_accessed = ? WHERE chunk_ids LIKE ?",
-                (datetime.utcnow().isoformat(), f'%"{chunk_id}"%'),
+                (utcnow().isoformat(), f'%"{chunk_id}"%'),
             )
 
     def list_most_accessed(self, limit: int = 20) -> list[Memory]:

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from contextweave.ingestion.base import BaseAdapter
 from contextweave.schemas import ContextEvent, SourceType
+from contextweave.timeutils import utcnow
 
 
 class CalendarAdapter(BaseAdapter):
@@ -41,7 +42,7 @@ class CalendarAdapter(BaseAdapter):
             dtstart = component.get("dtstart")
             attendees = component.get("attendee", [])
 
-            ts = datetime.utcnow()
+            ts = utcnow()
             if dtstart:
                 dt = dtstart.dt
                 ts = dt if isinstance(dt, datetime) else datetime.combine(dt, datetime.min.time())
@@ -93,7 +94,7 @@ class CalendarAdapter(BaseAdapter):
                     ContextEvent(
                         source=SourceType.CALENDAR,
                         content=content,
-                        timestamp=datetime.utcnow(),
+                        timestamp=utcnow(),
                         metadata={**meta, "event_title": current.get("SUMMARY", "")},
                         raw_format="ical",
                     )

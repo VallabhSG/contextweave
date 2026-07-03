@@ -8,6 +8,7 @@ import pytest
 
 from contextweave.processing.chunker import SemanticChunker
 from contextweave.schemas import ContextEvent, SourceType
+from contextweave.timeutils import utcnow
 
 
 @pytest.fixture
@@ -63,7 +64,7 @@ class TestChunker:
         event = ContextEvent(
             source=SourceType.NOTE,
             content="Short note.",
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
         )
         chunks = chunker.chunk_event(event)
         assert len(chunks) == 1
@@ -87,7 +88,7 @@ class TestChunker:
         event = ContextEvent(
             source=SourceType.NOTE,
             content="",
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
         )
         chunks = chunker.chunk_event(event)
         # Should produce one chunk even for empty content

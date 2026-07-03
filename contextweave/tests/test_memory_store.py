@@ -8,6 +8,7 @@ import pytest
 
 from contextweave.schemas import Chunk, ContextEvent, Memory, SourceType
 from contextweave.storage.memory_store import MemoryStore
+from contextweave.timeutils import utcnow
 
 
 @pytest.fixture
@@ -83,14 +84,14 @@ class TestMemoryStore:
             chunk_ids=["c1"],
             summary="note memory",
             source=SourceType.NOTE,
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             importance=0.5,
         )
         conv_mem = Memory(
             chunk_ids=["c2"],
             summary="chat memory",
             source=SourceType.CONVERSATION,
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             importance=0.5,
         )
         store.save_memory(note_mem)
@@ -105,14 +106,14 @@ class TestMemoryStore:
             chunk_ids=["c1"],
             summary="low",
             source=SourceType.NOTE,
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             importance=0.2,
         )
         high = Memory(
             chunk_ids=["c2"],
             summary="high",
             source=SourceType.NOTE,
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             importance=0.9,
         )
         store.save_memory(low)

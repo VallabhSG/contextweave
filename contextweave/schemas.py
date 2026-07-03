@@ -9,6 +9,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from contextweave.timeutils import utcnow
+
 
 class SourceType(str, Enum):
     CONVERSATION = "conversation"
@@ -59,7 +61,7 @@ class Memory(BaseModel):
     importance: float = 0.5
     access_count: int = 0
     last_accessed: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 class Entity(BaseModel):
