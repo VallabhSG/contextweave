@@ -241,6 +241,23 @@ class KnowledgeGraph:
                 for r in rows
             ]
 
+    def wipe(self) -> None:
+        """Erase all entities and edges (SQLite tables + in-memory graph)."""
+        with self._lock, self._conn() as conn:
+            for table in ("entities", "entity_edges", "entity_chunks"):
+                conn.execute(f"DELETE FROM {table}")  # noqa: S608 — fixed table list
+            self._graph.clear()
+
+    def export_data(self) -> dict:
+        """Portable dump of entities and co-occurrence edges."""
+        with self._conn() as conn:
+            entities = [dict(r) for r in conn.execute("SELECT * FROM entities").fetchall()]
+            edges = [
+                dict(r)
+                for r in conn.execute("SELECT source, target, weight FROM entity_edges").fetchall()
+            ]
+        return {"entities": entities, "edges": edges}
+
     def connection_count(self, entity_name: str) -> int:
         """Number of direct connections for an entity."""
         with self._lock:

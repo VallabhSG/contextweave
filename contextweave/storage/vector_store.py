@@ -133,6 +133,10 @@ class VectorStore:
         collection = self._get_collection()
         collection.delete(ids=chunk_ids)
 
+    def reset(self) -> None:
+        """Drop the collection; it is lazily recreated empty on next use."""
+        self._reset_collection()
+
     def count(self) -> int:
         """Total chunks stored."""
         return self._get_collection().count()

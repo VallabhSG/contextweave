@@ -51,6 +51,12 @@ CREATE TABLE IF NOT EXISTS memories (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS digests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    generated_at TEXT NOT NULL,
+    payload TEXT NOT NULL
+);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
     id UNINDEXED,
     content,
@@ -247,6 +253,54 @@ class MemoryStore:
                 (limit,),
             ).fetchall()
             return [self._row_to_memory(r) for r in rows]
+
+    def list_recent(self, limit: int = 20) -> list[Memory]:
+        """Most recent memories by timestamp, newest first."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM memories ORDER BY timestamp DESC LIMIT ?", (limit,)
+            ).fetchall()
+            return [self._row_to_memory(r) for r in rows]
+
+    # ── Digests ─────────────────────────────────────────────
+
+    def save_digest(self, payload_json: str) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO digests (generated_at, payload) VALUES (?, ?)",
+                (utcnow().isoformat(), payload_json),
+            )
+
+    def latest_digest(self) -> tuple[datetime, str] | None:
+        """Newest stored digest as (generated_at, payload_json), or None."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT generated_at, payload FROM digests ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            if row:
+                return datetime.fromisoformat(row["generated_at"]), row["payload"]
+        return None
+
+    # ── Data control ────────────────────────────────────────
+
+    def wipe(self) -> None:
+        """Erase all stored data (events, chunks, memories, FTS index, digests)."""
+        with self._conn() as conn:
+            for table in ("events", "chunks", "memories", "chunks_fts", "digests"):
+                conn.execute(f"DELETE FROM {table}")  # noqa: S608 — fixed table list
+
+    def export_data(self) -> dict:
+        """Portable dump of all events, chunks (sans embeddings), and memories."""
+        with self._conn() as conn:
+            events = [dict(r) for r in conn.execute("SELECT * FROM events").fetchall()]
+            chunks = [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT id, event_id, content, timestamp, source, entities, metadata FROM chunks"
+                ).fetchall()
+            ]
+            memories = [dict(r) for r in conn.execute("SELECT * FROM memories").fetchall()]
+        return {"events": events, "chunks": chunks, "memories": memories}
 
     def stats(self) -> dict:
         with self._conn() as conn:

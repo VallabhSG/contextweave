@@ -2,59 +2,26 @@
 
 import logging
 import tempfile
-import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
+from contextweave.api.account import router as account_router
+from contextweave.api.deps import get_workspace
+from contextweave.api.digest_routes import router as digest_router
 from contextweave.api.rate_limit import BATCH_LIMIT, INGEST_LIMIT, QUERY_LIMIT, limiter
 from contextweave.ingestion.calendar_adapter import CalendarAdapter
 from contextweave.ingestion.chat_adapter import ChatAdapter
 from contextweave.ingestion.text_adapter import TextAdapter
-from contextweave.processing.chunker import SemanticChunker
-from contextweave.processing.embedder import LocalEmbedder
-from contextweave.processing.entity_extractor import EntityExtractor
-from contextweave.processing.importance_scorer import ImportanceScorer
-from contextweave.reasoning.engine import ReasoningEngine
-from contextweave.retrieval.hybrid_retriever import HybridRetriever
 from contextweave.schemas import Memory, SourceType
-from contextweave.storage.knowledge_graph import KnowledgeGraph
-from contextweave.storage.memory_store import MemoryStore
-from contextweave.storage.vector_store import VectorStore
+from contextweave.workspaces import Workspace, manager
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# ── Shared instances (initialized lazily) ───────────────────
-
-_instances: dict = {}
-_instances_lock = threading.Lock()
-
-
-def _get(key: str):
-    with _instances_lock:
-        if key not in _instances:
-            _instances["memory_store"] = MemoryStore()
-            _instances["vector_store"] = VectorStore()
-            _instances["knowledge_graph"] = KnowledgeGraph()
-            _instances["embedder"] = LocalEmbedder()
-            _instances["chunker"] = SemanticChunker()
-            _instances["extractor"] = EntityExtractor()
-            _instances["scorer"] = ImportanceScorer()
-            _instances["retriever"] = HybridRetriever(
-                vector_store=_instances["vector_store"],
-                memory_store=_instances["memory_store"],
-                knowledge_graph=_instances["knowledge_graph"],
-                embedder=_instances["embedder"],
-                scorer=_instances["scorer"],
-            )
-            _instances["reasoning"] = ReasoningEngine()
-        return _instances[key]
-
 
 ADAPTERS = {
     ".txt": TextAdapter(),
@@ -120,7 +87,9 @@ class HealthResponse(BaseModel):
 
 @router.post("/ingest", response_model=IngestResponse)
 @limiter.limit(INGEST_LIMIT)
-async def ingest_file(request: Request, file: UploadFile = File(...)):
+async def ingest_file(
+    request: Request, file: UploadFile = File(...), ws: Workspace = Depends(get_workspace)
+):
     """Ingest a file (text, markdown, JSON chat, ICS calendar)."""
     suffix = Path(file.filename or "upload.txt").suffix.lower()
     adapter = ADAPTERS.get(suffix)
@@ -139,14 +108,16 @@ async def ingest_file(request: Request, file: UploadFile = File(...)):
 
     try:
         events = await run_in_threadpool(adapter.ingest_file, tmp_path)
-        return await run_in_threadpool(_process_events, events)
+        return await run_in_threadpool(_process_events, ws, events)
     finally:
         tmp_path.unlink(missing_ok=True)
 
 
 @router.post("/ingest/text", response_model=IngestResponse)
 @limiter.limit(INGEST_LIMIT)
-async def ingest_text(request: Request, req: IngestTextRequest):
+async def ingest_text(
+    request: Request, req: IngestTextRequest, ws: Workspace = Depends(get_workspace)
+):
     """Ingest raw text content."""
     try:
         source = SourceType(req.source) if req.source else SourceType.NOTE
@@ -155,12 +126,16 @@ async def ingest_text(request: Request, req: IngestTextRequest):
 
     adapter = TextAdapter()
     events = adapter.ingest_text(req.content, metadata=req.metadata, source=source)
-    return await run_in_threadpool(_process_events, events)
+    return await run_in_threadpool(_process_events, ws, events)
 
 
 @router.post("/ingest/batch", response_model=IngestResponse)
 @limiter.limit(BATCH_LIMIT)
-async def ingest_batch(request: Request, files: list[UploadFile] = File(...)):
+async def ingest_batch(
+    request: Request,
+    files: list[UploadFile] = File(...),
+    ws: Workspace = Depends(get_workspace),
+):
     """Batch ingest multiple files."""
     if len(files) > MAX_BATCH_FILES:
         raise HTTPException(400, f"Too many files (max {MAX_BATCH_FILES} per batch)")
@@ -190,36 +165,33 @@ async def ingest_batch(request: Request, files: list[UploadFile] = File(...)):
         finally:
             tmp_path.unlink(missing_ok=True)
 
-    return await run_in_threadpool(_process_events, total_events)
+    return await run_in_threadpool(_process_events, ws, total_events)
 
 
-def _process_events(events) -> IngestResponse:
+def _process_events(ws: Workspace, events) -> IngestResponse:
     """Shared pipeline: chunk → embed → extract entities → store."""
     if not events:
         return IngestResponse(message="No content extracted from input")
 
-    store: MemoryStore = _get("memory_store")
-    vstore: VectorStore = _get("vector_store")
-    graph: KnowledgeGraph = _get("knowledge_graph")
-    chunker: SemanticChunker = _get("chunker")
-    embedder: LocalEmbedder = _get("embedder")
-    extractor: EntityExtractor = _get("extractor")
-    scorer: ImportanceScorer = _get("scorer")
+    shared = manager.shared()
+    store = ws.memory_store
+    vstore = ws.vector_store
+    graph = ws.knowledge_graph
 
     # Save raw events
     store.save_events(events)
 
     # Chunk
-    chunks = chunker.chunk_events(events)
+    chunks = shared.chunker.chunk_events(events)
 
     # Embed
-    chunks = embedder.embed_chunks(chunks)
+    chunks = shared.embedder.embed_chunks(chunks)
 
     # Extract entities and attach to chunks
     total_entities = 0
     processed_chunks = []
     for chunk in chunks:
-        entities = extractor.extract_from_chunk(chunk)
+        entities = shared.extractor.extract_from_chunk(chunk)
         entity_names = [e.name for e in entities]
         chunk = chunk.model_copy(update={"entities": entity_names})
         total_entities += len(entities)
@@ -233,7 +205,7 @@ def _process_events(events) -> IngestResponse:
         store.save_chunk(chunk)
 
         # Create memory from chunk
-        importance = scorer.estimate_base_importance(chunk.content, chunk.source.value)
+        importance = shared.scorer.estimate_base_importance(chunk.content, chunk.source.value)
         memory = Memory(
             chunk_ids=[chunk.id],
             summary=chunk.content[:200],
@@ -259,7 +231,10 @@ def _process_events(events) -> IngestResponse:
         chunks_created=len(chunks),
         entities_extracted=total_entities,
         vectors_stored=vectors_stored,
-        message=f"Ingested {len(events)} events into {len(chunks)} chunks ({vectors_stored} vectors stored)",
+        message=(
+            f"Ingested {len(events)} events into {len(chunks)} chunks "
+            f"({vectors_stored} vectors stored)"
+        ),
     )
 
 
@@ -281,12 +256,9 @@ def _parse_query_date(value: str | None, field_name: str) -> datetime | None:
     return parsed
 
 
-def _run_query(req: QueryRequest) -> QueryResponse:
+def _run_query(ws: Workspace, req: QueryRequest) -> QueryResponse:
     """Shared retrieval + reasoning pipeline for the query endpoints."""
-    retriever: HybridRetriever = _get("retriever")
-    reasoning: ReasoningEngine = _get("reasoning")
-    store: MemoryStore = _get("memory_store")
-    graph: KnowledgeGraph = _get("knowledge_graph")
+    reasoning = manager.shared().reasoning
 
     # Parse optional date range (fail fast, before spending an LLM call)
     date_from = _parse_query_date(req.date_from, "date_from")
@@ -298,7 +270,7 @@ def _run_query(req: QueryRequest) -> QueryResponse:
     # Query expansion
     expanded_terms = reasoning.expand_query(req.query)
 
-    results = retriever.retrieve(
+    results = ws.retriever.retrieve(
         query=req.query,
         top_k=req.top_k,
         source_filter=req.source_filter,
@@ -311,13 +283,13 @@ def _run_query(req: QueryRequest) -> QueryResponse:
         query=req.query,
         results=results,
         query_type=req.query_type,
-        knowledge_graph=graph,
+        knowledge_graph=ws.knowledge_graph,
     )
 
     # Record access for cited chunks (best-effort, never fails the query)
     for chunk_id in response.cited_memories:
         try:
-            store.record_chunk_access(chunk_id)
+            ws.memory_store.record_chunk_access(chunk_id)
         except Exception as e:
             logger.debug("Could not record access for chunk %s: %s", chunk_id, e)
 
@@ -335,14 +307,14 @@ def _run_query(req: QueryRequest) -> QueryResponse:
 
 @router.post("/query", response_model=QueryResponse)
 @limiter.limit(QUERY_LIMIT)
-def query_memories(request: Request, req: QueryRequest):
+def query_memories(request: Request, req: QueryRequest, ws: Workspace = Depends(get_workspace)):
     """Natural language query against your memory."""
-    return _run_query(req)
+    return _run_query(ws, req)
 
 
 @router.post("/query/patterns", response_model=QueryResponse)
 @limiter.limit(QUERY_LIMIT)
-def detect_patterns(request: Request, req: QueryRequest):
+def detect_patterns(request: Request, req: QueryRequest, ws: Workspace = Depends(get_workspace)):
     """Detect patterns across recent context."""
     req_with_type = QueryRequest(
         query=req.query,
@@ -350,7 +322,7 @@ def detect_patterns(request: Request, req: QueryRequest):
         top_k=req.top_k,
         source_filter=req.source_filter,
     )
-    return _run_query(req_with_type)
+    return _run_query(ws, req_with_type)
 
 
 # ── Memory Endpoints ────────────────────────────────────────
@@ -362,10 +334,10 @@ def list_memories(
     min_importance: float = 0.0,
     limit: int = Query(default=50, le=200),
     offset: int = 0,
+    ws: Workspace = Depends(get_workspace),
 ):
     """List memories filtered by source, importance, with pagination."""
-    store: MemoryStore = _get("memory_store")
-    memories = store.list_memories(
+    memories = ws.memory_store.list_memories(
         source=source,
         min_importance=min_importance,
         limit=limit,
@@ -375,25 +347,24 @@ def list_memories(
 
 
 @router.get("/memories/top/accessed")
-def top_accessed_memories(limit: int = Query(default=20, le=100)):
+def top_accessed_memories(
+    limit: int = Query(default=20, le=100), ws: Workspace = Depends(get_workspace)
+):
     """List most frequently accessed memories."""
-    store: MemoryStore = _get("memory_store")
-    memories = store.list_most_accessed(limit=limit)
+    memories = ws.memory_store.list_most_accessed(limit=limit)
     return {"memories": [m.model_dump() for m in memories], "count": len(memories)}
 
 
 @router.get("/memories/{memory_id}")
-def get_memory(memory_id: str):
+def get_memory(memory_id: str, ws: Workspace = Depends(get_workspace)):
     """Get a specific memory with its connected entities."""
-    store: MemoryStore = _get("memory_store")
-    memory = store.get_memory(memory_id)
+    memory = ws.memory_store.get_memory(memory_id)
     if not memory:
         raise HTTPException(404, "Memory not found")
 
-    graph: KnowledgeGraph = _get("knowledge_graph")
     connections = {}
     for entity_name in memory.entities:
-        entity = graph.get_entity(entity_name)
+        entity = ws.knowledge_graph.get_entity(entity_name)
         if entity:
             connections[entity_name] = entity.model_dump()
 
@@ -404,27 +375,24 @@ def get_memory(memory_id: str):
 
 
 @router.get("/graph/entities")
-def list_entities(limit: int = Query(default=100, le=500)):
+def list_entities(limit: int = Query(default=100, le=500), ws: Workspace = Depends(get_workspace)):
     """List all known entities and their connections."""
-    graph: KnowledgeGraph = _get("knowledge_graph")
-    entities = graph.list_entities(limit=limit)
+    entities = ws.knowledge_graph.list_entities(limit=limit)
     return {"entities": [e.model_dump() for e in entities], "count": len(entities)}
 
 
 @router.get("/graph/entity/{name}")
-def get_entity(name: str):
+def get_entity(name: str, ws: Workspace = Depends(get_workspace)):
     """Get all memories connected to an entity."""
-    graph: KnowledgeGraph = _get("knowledge_graph")
-    entity = graph.get_entity(name)
+    entity = ws.knowledge_graph.get_entity(name)
     if not entity:
         raise HTTPException(404, f"Entity '{name}' not found")
 
-    chunk_ids = graph.get_connected_chunks(name, hops=2)
+    chunk_ids = ws.knowledge_graph.get_connected_chunks(name, hops=2)
 
-    store: MemoryStore = _get("memory_store")
     chunks = []
     for cid in chunk_ids[:50]:
-        chunk = store.get_chunk(cid)
+        chunk = ws.memory_store.get_chunk(cid)
         if chunk:
             chunks.append(
                 {
@@ -501,21 +469,23 @@ def debug_gemini():
 
 
 @router.get("/health", response_model=HealthResponse)
-def health():
-    """System health and statistics."""
-    store: MemoryStore = _get("memory_store")
-    vstore: VectorStore = _get("vector_store")
-    graph: KnowledgeGraph = _get("knowledge_graph")
-
-    db_stats = store.stats()
-    graph_stats = graph.stats()
+def health(ws: Workspace = Depends(get_workspace)):
+    """Health and statistics for the caller's workspace."""
+    db_stats = ws.memory_store.stats()
+    graph_stats = ws.knowledge_graph.stats()
 
     return HealthResponse(
         status="ok",
         events=db_stats["events"],
         chunks=db_stats["chunks"],
         memories=db_stats["memories"],
-        vectors=vstore.count(),
+        vectors=ws.vector_store.count(),
         entities=graph_stats["entities"],
         edges=graph_stats["edges"],
     )
+
+
+# ── Sub-routers ─────────────────────────────────────────────
+
+router.include_router(account_router)
+router.include_router(digest_router)

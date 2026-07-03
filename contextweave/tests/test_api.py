@@ -7,29 +7,7 @@ vector store stays empty so retrieval skips embedding entirely.
 
 from __future__ import annotations
 
-import pytest
-from fastapi.testclient import TestClient
-
 import contextweave.api.routes as routes
-from contextweave.api.rate_limit import limiter
-from contextweave.config import settings
-
-
-@pytest.fixture
-def client(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "sqlite_db_path", str(tmp_path / "test.db"))
-    monkeypatch.setattr(settings, "chroma_persist_dir", str(tmp_path / "chroma"))
-    monkeypatch.setattr(settings, "groq_api_key", "")
-    routes._instances.clear()
-    limiter.reset()
-
-    from main import app
-
-    with TestClient(app) as c:
-        yield c
-
-    routes._instances.clear()
-    limiter.reset()
 
 
 class TestHealth:

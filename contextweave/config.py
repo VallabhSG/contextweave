@@ -15,6 +15,9 @@ class Settings(BaseSettings):
 
     chroma_persist_dir: str = "./chroma_data"
     sqlite_db_path: str = "./contextweave.db"
+    data_dir: str = "./data"
+
+    digest_cache_hours: float = 12.0
 
     chunk_max_tokens: int = 512
     chunk_overlap_sentences: int = 2
