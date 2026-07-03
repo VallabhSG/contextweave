@@ -31,7 +31,6 @@ SOURCE_CREDIBILITY = {
 
 
 class ReasoningEngine:
-
     def __init__(self, api_key: str | None = None):
         self._api_key = api_key or settings.groq_api_key
         self._model_name = settings.reasoning_model
@@ -40,6 +39,7 @@ class ReasoningEngine:
     def _get_client(self):
         if self._client is None:
             from groq import Groq
+
             self._client = Groq(api_key=self._api_key)
         return self._client
 
@@ -50,11 +50,16 @@ class ReasoningEngine:
             client = self._get_client()
             response = client.chat.completions.create(
                 model=self._model_name,
-                messages=[{"role": "user", "content": (
-                    "Generate 3-4 related search terms to broaden this query. "
-                    "Return ONLY a JSON array of short strings, no explanation.\n"
-                    f"Query: {query}"
-                )}],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            "Generate 3-4 related search terms to broaden this query. "
+                            "Return ONLY a JSON array of short strings, no explanation.\n"
+                            f"Query: {query}"
+                        ),
+                    }
+                ],
                 temperature=0.3,
                 max_tokens=80,
             )

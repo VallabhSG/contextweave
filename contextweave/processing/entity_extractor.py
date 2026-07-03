@@ -34,6 +34,7 @@ class EntityExtractor:
     def _get_client(self):
         if self._client is None:
             from groq import Groq
+
             self._client = Groq(api_key=self._api_key)
         return self._client
 

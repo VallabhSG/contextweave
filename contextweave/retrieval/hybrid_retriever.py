@@ -6,12 +6,13 @@ import logging
 from datetime import datetime
 
 from contextweave.config import settings
-from contextweave.processing.embedder import GeminiEmbedder
+from contextweave.processing.embedder import LocalEmbedder
 from contextweave.processing.importance_scorer import ImportanceScorer
 from contextweave.schemas import QueryResult, SourceType
 from contextweave.storage.knowledge_graph import KnowledgeGraph
 from contextweave.storage.memory_store import MemoryStore
 from contextweave.storage.vector_store import VectorStore
+from contextweave.timeutils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class HybridRetriever:
         vector_store: VectorStore,
         memory_store: MemoryStore,
         knowledge_graph: KnowledgeGraph,
-        embedder: GeminiEmbedder,
+        embedder: LocalEmbedder,
         scorer: ImportanceScorer | None = None,
     ):
         self.vector_store = vector_store
@@ -167,7 +168,8 @@ class HybridRetriever:
         # 7. Filter by date range if specified
         if date_from or date_to:
             results = [
-                r for r in results
+                r
+                for r in results
                 if (date_from is None or r.timestamp >= date_from)
                 and (date_to is None or r.timestamp <= date_to)
             ]
@@ -179,8 +181,8 @@ class HybridRetriever:
     @staticmethod
     def _parse_timestamp(ts_str: str) -> datetime:
         if not ts_str:
-            return datetime.utcnow()
+            return utcnow()
         try:
             return datetime.fromisoformat(ts_str)
         except ValueError:
-            return datetime.utcnow()
+            return utcnow()

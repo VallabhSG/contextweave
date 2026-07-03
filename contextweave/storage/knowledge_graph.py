@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import threading
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -54,6 +55,7 @@ class KnowledgeGraph:
     def __init__(self, db_path: str | None = None):
         self._db_path = db_path or settings.sqlite_db_path
         self._graph = nx.Graph()
+        self._lock = threading.RLock()  # the in-memory NetworkX graph is not thread-safe
         self._ensure_schema()
         self._load_graph()
 
@@ -92,7 +94,7 @@ class KnowledgeGraph:
 
     def add_entities(self, entities: list[Entity], chunk_id: str) -> None:
         """Add entities and create co-occurrence edges from a single chunk."""
-        with self._conn() as conn:
+        with self._lock, self._conn() as conn:
             entity_names = []
 
             for entity in entities:
@@ -160,20 +162,21 @@ class KnowledgeGraph:
 
     def get_neighbors(self, entity_name: str, hops: int = 1) -> list[str]:
         """Get entities within N hops of the given entity."""
-        if entity_name not in self._graph:
-            return []
+        with self._lock:
+            if entity_name not in self._graph:
+                return []
 
-        visited = set()
-        frontier = {entity_name}
+            visited = set()
+            frontier = {entity_name}
 
-        for _ in range(hops):
-            next_frontier = set()
-            for node in frontier:
-                for neighbor in self._graph.neighbors(node):
-                    if neighbor not in visited and neighbor != entity_name:
-                        next_frontier.add(neighbor)
-                        visited.add(neighbor)
-            frontier = next_frontier
+            for _ in range(hops):
+                next_frontier = set()
+                for node in frontier:
+                    for neighbor in self._graph.neighbors(node):
+                        if neighbor not in visited and neighbor != entity_name:
+                            next_frontier.add(neighbor)
+                            visited.add(neighbor)
+                frontier = next_frontier
 
         return sorted(visited)
 
@@ -240,12 +243,14 @@ class KnowledgeGraph:
 
     def connection_count(self, entity_name: str) -> int:
         """Number of direct connections for an entity."""
-        if entity_name not in self._graph:
-            return 0
-        return self._graph.degree(entity_name)
+        with self._lock:
+            if entity_name not in self._graph:
+                return 0
+            return self._graph.degree(entity_name)
 
     def stats(self) -> dict:
-        return {
-            "entities": self._graph.number_of_nodes(),
-            "edges": self._graph.number_of_edges(),
-        }
+        with self._lock:
+            return {
+                "entities": self._graph.number_of_nodes(),
+                "edges": self._graph.number_of_edges(),
+            }

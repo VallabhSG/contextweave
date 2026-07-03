@@ -10,7 +10,7 @@ from contextweave.schemas import Chunk
 logger = logging.getLogger(__name__)
 
 
-class GeminiEmbedder:
+class LocalEmbedder:
     """Local embedder using fastembed (BAAI/bge-small-en-v1.5, 384-dim)."""
 
     def __init__(self, model: str | None = None, **_kwargs):
@@ -20,6 +20,7 @@ class GeminiEmbedder:
     def _get_model(self):
         if self._model is None:
             from fastembed import TextEmbedding
+
             self._model = TextEmbedding(model_name=self._model_name)
         return self._model
 

@@ -1,24 +1,26 @@
 """FastAPI routes for ContextWeave."""
 
-from __future__ import annotations
-
 import logging
 import tempfile
+import threading
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
+from contextweave.api.rate_limit import BATCH_LIMIT, INGEST_LIMIT, QUERY_LIMIT, limiter
 from contextweave.ingestion.calendar_adapter import CalendarAdapter
 from contextweave.ingestion.chat_adapter import ChatAdapter
 from contextweave.ingestion.text_adapter import TextAdapter
 from contextweave.processing.chunker import SemanticChunker
-from contextweave.processing.embedder import GeminiEmbedder  # fastembed-backed, name kept for compat
+from contextweave.processing.embedder import LocalEmbedder
 from contextweave.processing.entity_extractor import EntityExtractor
 from contextweave.processing.importance_scorer import ImportanceScorer
 from contextweave.reasoning.engine import ReasoningEngine
 from contextweave.retrieval.hybrid_retriever import HybridRetriever
-from contextweave.schemas import Memory
+from contextweave.schemas import Memory, SourceType
 from contextweave.storage.knowledge_graph import KnowledgeGraph
 from contextweave.storage.memory_store import MemoryStore
 from contextweave.storage.vector_store import VectorStore
@@ -30,26 +32,28 @@ router = APIRouter()
 # ── Shared instances (initialized lazily) ───────────────────
 
 _instances: dict = {}
+_instances_lock = threading.Lock()
 
 
 def _get(key: str):
-    if key not in _instances:
-        _instances["memory_store"] = MemoryStore()
-        _instances["vector_store"] = VectorStore()
-        _instances["knowledge_graph"] = KnowledgeGraph()
-        _instances["embedder"] = GeminiEmbedder()
-        _instances["chunker"] = SemanticChunker()
-        _instances["extractor"] = EntityExtractor()
-        _instances["scorer"] = ImportanceScorer()
-        _instances["retriever"] = HybridRetriever(
-            vector_store=_instances["vector_store"],
-            memory_store=_instances["memory_store"],
-            knowledge_graph=_instances["knowledge_graph"],
-            embedder=_instances["embedder"],
-            scorer=_instances["scorer"],
-        )
-        _instances["reasoning"] = ReasoningEngine()
-    return _instances[key]
+    with _instances_lock:
+        if key not in _instances:
+            _instances["memory_store"] = MemoryStore()
+            _instances["vector_store"] = VectorStore()
+            _instances["knowledge_graph"] = KnowledgeGraph()
+            _instances["embedder"] = LocalEmbedder()
+            _instances["chunker"] = SemanticChunker()
+            _instances["extractor"] = EntityExtractor()
+            _instances["scorer"] = ImportanceScorer()
+            _instances["retriever"] = HybridRetriever(
+                vector_store=_instances["vector_store"],
+                memory_store=_instances["memory_store"],
+                knowledge_graph=_instances["knowledge_graph"],
+                embedder=_instances["embedder"],
+                scorer=_instances["scorer"],
+            )
+            _instances["reasoning"] = ReasoningEngine()
+        return _instances[key]
 
 
 ADAPTERS = {
@@ -60,23 +64,26 @@ ADAPTERS = {
     ".ics": CalendarAdapter(),
 }
 
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB per file
+MAX_BATCH_FILES = 20
+
 
 # ── Request/Response Models ─────────────────────────────────
 
 
 class IngestTextRequest(BaseModel):
-    content: str
+    content: str = Field(min_length=1, max_length=100_000)
     source: str = "note"
     metadata: dict = Field(default_factory=dict)
 
 
 class QueryRequest(BaseModel):
-    query: str
+    query: str = Field(min_length=1, max_length=2_000)
     query_type: str | None = None
-    top_k: int = 8
+    top_k: int = Field(default=8, ge=1, le=50)
     source_filter: str | None = None
     date_from: str | None = None  # ISO date e.g. "2024-01-01"
-    date_to: str | None = None    # ISO date e.g. "2024-12-31"
+    date_to: str | None = None  # ISO date e.g. "2024-12-31"
 
 
 class QueryResponse(BaseModel):
@@ -112,7 +119,8 @@ class HealthResponse(BaseModel):
 
 
 @router.post("/ingest", response_model=IngestResponse)
-async def ingest_file(file: UploadFile = File(...)):
+@limiter.limit(INGEST_LIMIT)
+async def ingest_file(request: Request, file: UploadFile = File(...)):
     """Ingest a file (text, markdown, JSON chat, ICS calendar)."""
     suffix = Path(file.filename or "upload.txt").suffix.lower()
     adapter = ADAPTERS.get(suffix)
@@ -120,30 +128,43 @@ async def ingest_file(file: UploadFile = File(...)):
     if not adapter:
         raise HTTPException(400, f"Unsupported file type: {suffix}")
 
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, f"File too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)} MB)")
+
     # Write to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        content = await file.read()
         tmp.write(content)
         tmp_path = Path(tmp.name)
 
     try:
-        events = adapter.ingest_file(tmp_path)
-        return await _process_events(events)
+        events = await run_in_threadpool(adapter.ingest_file, tmp_path)
+        return await run_in_threadpool(_process_events, events)
     finally:
         tmp_path.unlink(missing_ok=True)
 
 
 @router.post("/ingest/text", response_model=IngestResponse)
-async def ingest_text(req: IngestTextRequest):
+@limiter.limit(INGEST_LIMIT)
+async def ingest_text(request: Request, req: IngestTextRequest):
     """Ingest raw text content."""
+    try:
+        source = SourceType(req.source) if req.source else SourceType.NOTE
+    except ValueError:
+        raise HTTPException(400, f"Unknown source type: {req.source!r}") from None
+
     adapter = TextAdapter()
-    events = adapter.ingest_text(req.content, metadata=req.metadata)
-    return await _process_events(events)
+    events = adapter.ingest_text(req.content, metadata=req.metadata, source=source)
+    return await run_in_threadpool(_process_events, events)
 
 
 @router.post("/ingest/batch", response_model=IngestResponse)
-async def ingest_batch(files: list[UploadFile] = File(...)):
+@limiter.limit(BATCH_LIMIT)
+async def ingest_batch(request: Request, files: list[UploadFile] = File(...)):
     """Batch ingest multiple files."""
+    if len(files) > MAX_BATCH_FILES:
+        raise HTTPException(400, f"Too many files (max {MAX_BATCH_FILES} per batch)")
+
     total_events = []
 
     for file in files:
@@ -152,21 +173,27 @@ async def ingest_batch(files: list[UploadFile] = File(...)):
         if not adapter:
             continue
 
+        content = await file.read(MAX_UPLOAD_BYTES + 1)
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                413,
+                f"File {file.filename!r} too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)} MB)",
+            )
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            content = await file.read()
             tmp.write(content)
             tmp_path = Path(tmp.name)
 
         try:
-            events = adapter.ingest_file(tmp_path)
+            events = await run_in_threadpool(adapter.ingest_file, tmp_path)
             total_events.extend(events)
         finally:
             tmp_path.unlink(missing_ok=True)
 
-    return await _process_events(total_events)
+    return await run_in_threadpool(_process_events, total_events)
 
 
-async def _process_events(events) -> IngestResponse:
+def _process_events(events) -> IngestResponse:
     """Shared pipeline: chunk → embed → extract entities → store."""
     if not events:
         return IngestResponse(message="No content extracted from input")
@@ -175,7 +202,7 @@ async def _process_events(events) -> IngestResponse:
     vstore: VectorStore = _get("vector_store")
     graph: KnowledgeGraph = _get("knowledge_graph")
     chunker: SemanticChunker = _get("chunker")
-    embedder: GeminiEmbedder = _get("embedder")
+    embedder: LocalEmbedder = _get("embedder")
     extractor: EntityExtractor = _get("extractor")
     scorer: ImportanceScorer = _get("scorer")
 
@@ -222,8 +249,8 @@ async def _process_events(events) -> IngestResponse:
 
     if vectors_stored == 0:
         logger.warning(
-            "No vectors stored for %d chunks — Gemini embedding may be failing. "
-            "Check CW_GEMINI_API_KEY is set correctly on Render.",
+            "No vectors stored for %d chunks — local fastembed embedding may be failing. "
+            "See /api/debug/status for diagnostics.",
             len(processed_chunks),
         )
 
@@ -239,22 +266,37 @@ async def _process_events(events) -> IngestResponse:
 # ── Query Endpoints ─────────────────────────────────────────
 
 
-@router.post("/query", response_model=QueryResponse)
-async def query_memories(req: QueryRequest):
-    """Natural language query against your memory."""
-    from datetime import datetime as dt
+def _parse_query_date(value: str | None, field_name: str) -> datetime | None:
+    """Parse an ISO date/datetime filter into naive UTC, or raise 400."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(
+            400, f"Invalid {field_name}: expected ISO format like 2026-01-31"
+        ) from None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
 
+
+def _run_query(req: QueryRequest) -> QueryResponse:
+    """Shared retrieval + reasoning pipeline for the query endpoints."""
     retriever: HybridRetriever = _get("retriever")
     reasoning: ReasoningEngine = _get("reasoning")
     store: MemoryStore = _get("memory_store")
     graph: KnowledgeGraph = _get("knowledge_graph")
 
+    # Parse optional date range (fail fast, before spending an LLM call)
+    date_from = _parse_query_date(req.date_from, "date_from")
+    date_to = _parse_query_date(req.date_to, "date_to")
+    if date_to and req.date_to and len(req.date_to) == 10:
+        # A bare date means "through the end of that day", not midnight
+        date_to = date_to.replace(hour=23, minute=59, second=59)
+
     # Query expansion
     expanded_terms = reasoning.expand_query(req.query)
-
-    # Parse optional date range
-    date_from = dt.fromisoformat(req.date_from) if req.date_from else None
-    date_to = dt.fromisoformat(req.date_to) if req.date_to else None
 
     results = retriever.retrieve(
         query=req.query,
@@ -272,12 +314,12 @@ async def query_memories(req: QueryRequest):
         knowledge_graph=graph,
     )
 
-    # Record access for cited chunks
+    # Record access for cited chunks (best-effort, never fails the query)
     for chunk_id in response.cited_memories:
         try:
             store.record_chunk_access(chunk_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not record access for chunk %s: %s", chunk_id, e)
 
     return QueryResponse(
         answer=response.answer,
@@ -291,8 +333,16 @@ async def query_memories(req: QueryRequest):
     )
 
 
+@router.post("/query", response_model=QueryResponse)
+@limiter.limit(QUERY_LIMIT)
+def query_memories(request: Request, req: QueryRequest):
+    """Natural language query against your memory."""
+    return _run_query(req)
+
+
 @router.post("/query/patterns", response_model=QueryResponse)
-async def detect_patterns(req: QueryRequest):
+@limiter.limit(QUERY_LIMIT)
+def detect_patterns(request: Request, req: QueryRequest):
     """Detect patterns across recent context."""
     req_with_type = QueryRequest(
         query=req.query,
@@ -300,14 +350,14 @@ async def detect_patterns(req: QueryRequest):
         top_k=req.top_k,
         source_filter=req.source_filter,
     )
-    return await query_memories(req_with_type)
+    return _run_query(req_with_type)
 
 
 # ── Memory Endpoints ────────────────────────────────────────
 
 
 @router.get("/memories")
-async def list_memories(
+def list_memories(
     source: str | None = None,
     min_importance: float = 0.0,
     limit: int = Query(default=50, le=200),
@@ -325,7 +375,7 @@ async def list_memories(
 
 
 @router.get("/memories/top/accessed")
-async def top_accessed_memories(limit: int = Query(default=20, le=100)):
+def top_accessed_memories(limit: int = Query(default=20, le=100)):
     """List most frequently accessed memories."""
     store: MemoryStore = _get("memory_store")
     memories = store.list_most_accessed(limit=limit)
@@ -333,7 +383,7 @@ async def top_accessed_memories(limit: int = Query(default=20, le=100)):
 
 
 @router.get("/memories/{memory_id}")
-async def get_memory(memory_id: str):
+def get_memory(memory_id: str):
     """Get a specific memory with its connected entities."""
     store: MemoryStore = _get("memory_store")
     memory = store.get_memory(memory_id)
@@ -354,7 +404,7 @@ async def get_memory(memory_id: str):
 
 
 @router.get("/graph/entities")
-async def list_entities(limit: int = Query(default=100, le=500)):
+def list_entities(limit: int = Query(default=100, le=500)):
     """List all known entities and their connections."""
     graph: KnowledgeGraph = _get("knowledge_graph")
     entities = graph.list_entities(limit=limit)
@@ -362,7 +412,7 @@ async def list_entities(limit: int = Query(default=100, le=500)):
 
 
 @router.get("/graph/entity/{name}")
-async def get_entity(name: str):
+def get_entity(name: str):
     """Get all memories connected to an entity."""
     graph: KnowledgeGraph = _get("knowledge_graph")
     entity = graph.get_entity(name)
@@ -392,7 +442,7 @@ async def get_entity(name: str):
 
 
 @router.get("/debug/status")
-async def debug_status():
+def debug_status():
     """Test embedding and generation stack health."""
     from contextweave.config import settings as cfg
 
@@ -403,6 +453,7 @@ async def debug_status():
     # Test local fastembed
     try:
         from fastembed import TextEmbedding
+
         model = TextEmbedding(model_name=cfg.embedding_model)
         embs = list(model.embed(["test"]))
         embed_ok = len(embs[0]) > 0
@@ -413,6 +464,7 @@ async def debug_status():
     if groq_key_set:
         try:
             from groq import Groq
+
             client = Groq(api_key=cfg.groq_api_key)
             r = client.chat.completions.create(
                 model=cfg.reasoning_model,
@@ -440,16 +492,16 @@ async def debug_status():
 
 # Keep old path as alias so existing bookmarks still work
 @router.get("/debug/gemini")
-async def debug_gemini():
+def debug_gemini():
     """Alias for /debug/status."""
-    return await debug_status()
+    return debug_status()
 
 
 # ── Health ──────────────────────────────────────────────────
 
 
 @router.get("/health", response_model=HealthResponse)
-async def health():
+def health():
     """System health and statistics."""
     store: MemoryStore = _get("memory_store")
     vstore: VectorStore = _get("vector_store")
