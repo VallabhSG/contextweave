@@ -148,7 +148,7 @@ Six query types automatically detected from query keywords:
 | Everything connects | Knowledge graph + hybrid retrieval (vector 50% · FTS 30% · graph 20%) with temporal decay |
 | A companion that remembers | Events → chunks → scored memories, with access-frequency and connection boosts |
 | Proactive nudges | `GET /api/digest` — cached daily digest of focus, commitments, and slipping threads, surfaced automatically in the UI |
-| Ambient capture | 🎙 Listen button — live speech-to-text via the Web Speech API straight into ingestion |
+| Ambient capture | 🎙 web Listen button (Web Speech API), `POST /api/ingest/audio` (Groq Whisper transcription), and an Expo iPhone/Android companion app ([`mobile/`](mobile/)) that records in 45s segments while you live your life |
 | Privacy: your data, your control | Private workspaces via `POST /api/auth/register` — isolated SQLite + vector collection per user, full `GET /api/export`, `DELETE /api/memory` |
 
 Without an API key you're in the **shared public demo space**. With one, every request routes to your own isolated workspace.
@@ -167,7 +167,13 @@ curl https://vallllllllll-contextweave.hf.space/api/digest -H "X-API-Key: cw_...
 # Take your data with you / erase it
 curl https://vallllllllll-contextweave.hf.space/api/export -H "X-API-Key: cw_..."
 curl -X DELETE https://vallllllllll-contextweave.hf.space/api/memory -H "X-API-Key: cw_..."
+
+# Speak instead of type — audio is transcribed, then discarded
+curl -X POST https://vallllllllll-contextweave.hf.space/api/ingest/audio \
+  -H "X-API-Key: cw_..." -F "file=@voice-note.m4a"
 ```
+
+**Mobile ambient capture:** the [`mobile/`](mobile/) Expo app is the "phone on the table" experience — tap Listen and it records 45-second segments, ships each to `/api/ingest/audio`, and shows your nudge. See [mobile/README.md](mobile/README.md).
 
 ---
 

@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "ContextWeave",
+    "slug": "contextweave",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#14110d",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.contextweave.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "ContextWeave listens so you can stay present — recordings are transcribed into your private memory and never stored as audio.",
+        "UIBackgroundModes": ["audio"]
+      }
+    },
+    "android": {
+      "package": "com.contextweave.app",
+      "permissions": ["android.permission.RECORD_AUDIO"]
+    },
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow ContextWeave to capture your conversations ambiently."
+        }
+      ]
+    ]
+  }
+}
