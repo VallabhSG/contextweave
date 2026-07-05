@@ -269,8 +269,22 @@ stable private workspace (`cw_*` keys keep working alongside):
 curl https://your-host/api/me -H "Authorization: Bearer <supabase-access-token>"
 ```
 
-**On HuggingFace Spaces:** add both values under **Settings → Variables and secrets** as
-*secrets*. Never commit them to the repo.
+To surface the **Sign in / Create account** form in the web UI, also provide the two
+public values from **Dashboard → Settings → API** (the browser needs them to run the
+sign-in flow; they are safe to expose):
+
+```bash
+CW_SUPABASE_URL=https://<project-ref>.supabase.co
+CW_SUPABASE_ANON_KEY=<anon-public-key>
+```
+
+Tip: for instant email+password sign-up during demos, disable **Authentication →
+Providers → Email → Confirm email** in Supabase — otherwise new accounts must confirm
+via a (rate-limited) email first.
+
+**On HuggingFace Spaces:** add `CW_DATABASE_URL` and `CW_SUPABASE_JWT_SECRET` under
+**Settings → Variables and secrets** as *secrets*; the URL and anon key may be plain
+variables. Never commit any of them to the repo.
 
 ---
 

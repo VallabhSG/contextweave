@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     database_url: str = ""
     # Supabase Auth: project JWT secret; enables sign-in tokens alongside cw_ keys
     supabase_jwt_secret: str = ""
+    # Supabase Auth for the web UI: project URL + anon key are public by design
+    # and are served to the browser so it can run the sign-in flow itself.
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
 
     digest_cache_hours: float = 12.0
 

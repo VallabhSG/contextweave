@@ -12,9 +12,12 @@
   };
 
   // ── API ──────────────────────────────────────────────────────
-  // A stored key routes every call to the caller's private workspace;
-  // without one the server serves the shared demo space.
+  // A Supabase session outranks a pasted key — the signed-in identity is
+  // what the Space panel shows, so requests must match it. A stored key
+  // routes to that key's workspace; with neither, the shared demo space.
   function authHeaders() {
+    const t = window.CWAuth && window.CWAuth.token();
+    if (t) return { 'Authorization': 'Bearer ' + t };
     const k = localStorage.getItem('cw_api_key');
     return k ? { 'X-API-Key': k } : {};
   }
@@ -522,13 +525,26 @@
 
   // ── PRIVATE SPACE ────────────────────────────────────────────
   function spaceStatusRefresh() {
+    const email = (window.CWAuth && window.CWAuth.email()) || null;
     const hasKey = !!localStorage.getItem('cw_api_key');
-    document.getElementById('space-status').textContent = hasKey
-      ? 'Private space active — memories here are yours alone.'
-      : 'Public demo space — anything you ingest is visible to other visitors.';
-    document.getElementById('btn-wipe').classList.toggle('hidden', !hasKey);
-    document.getElementById('btn-leave-space').classList.toggle('hidden', !hasKey);
-    document.getElementById('btn-create-space').classList.toggle('hidden', hasKey);
+    const isPrivate = !!email || hasKey;
+    document.getElementById('space-status').textContent = email
+      ? `Signed in as ${email} — memories here are yours alone.`
+      : hasKey
+        ? 'Private space active — memories here are yours alone.'
+        : 'Public demo space — anything you ingest is visible to other visitors.';
+    document.getElementById('btn-wipe').classList.toggle('hidden', !isPrivate);
+    document.getElementById('btn-leave-space').classList.toggle('hidden', !hasKey || !!email);
+    document.getElementById('btn-create-space').classList.toggle('hidden', isPrivate);
+    document.getElementById('btn-sign-out').classList.toggle('hidden', !email);
+    // While signed in, the key-paste flow is hidden to avoid mixed identities
+    document.getElementById('key-input').classList.toggle('hidden', !!email);
+    document.getElementById('btn-use-key').classList.toggle('hidden', !!email);
+    const authBox = document.getElementById('auth-box');
+    if (authBox) {
+      const authEnabled = !!(window.CWAuth && window.CWAuth.enabled);
+      authBox.classList.toggle('hidden', !authEnabled || !!email);
+    }
   }
 
   async function refreshAll() {
@@ -628,6 +644,56 @@
     document.getElementById('btn-refresh-nudge').addEventListener('click', () => loadDigest(true));
   }
 
+  // ── SUPABASE SIGN-IN ─────────────────────────────────────────
+  function initAuth() {
+    if (!document.getElementById('auth-box')) return;
+    const emailEl = document.getElementById('auth-email');
+    const pwEl = document.getElementById('auth-password');
+
+    async function doAuth(mode) {
+      const email = emailEl.value.trim();
+      const pw = pwEl.value;
+      if (!email || !pw) { toast('Email and password required.', 'error'); return; }
+      const btn = document.getElementById(mode === 'in' ? 'btn-sign-in' : 'btn-sign-up');
+      btn.disabled = true;
+      try {
+        if (mode === 'in') {
+          await window.CWAuth.signIn(email, pw);
+          toast('Signed in — this space is yours alone.', 'success');
+        } else {
+          const active = await window.CWAuth.signUp(email, pw);
+          if (!active) {
+            toast('Account created — confirm via the email we sent, then sign in.', 'info', 8000);
+            return;
+          }
+          toast('Account created — you are signed in.', 'success');
+        }
+        pwEl.value = '';
+        spaceStatusRefresh();
+        await refreshAll();
+      } catch (e) {
+        toast(`Sign-${mode === 'in' ? 'in' : 'up'} failed: ${e.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById('btn-sign-in').addEventListener('click', () => doAuth('in'));
+    document.getElementById('btn-sign-up').addEventListener('click', () => doAuth('up'));
+    pwEl.addEventListener('keydown', e => { if (e.key === 'Enter') doAuth('in'); });
+
+    document.getElementById('btn-sign-out').addEventListener('click', async () => {
+      try {
+        await window.CWAuth.signOut();
+        toast('Signed out — back in the public demo space.', 'info');
+        spaceStatusRefresh();
+        await refreshAll();
+      } catch (e) {
+        toast(`Sign-out failed: ${e.message}`, 'error');
+      }
+    });
+  }
+
   // ── INIT ─────────────────────────────────────────────────────
   function setupNav() {
     const nav = document.getElementById('nav');
@@ -683,7 +749,14 @@
 
     document.getElementById('btn-load-entities').addEventListener('click', loadEntities);
 
+    // Resolve any existing Supabase session before the first data load so
+    // the initial requests already carry the caller's identity.
+    if (window.CWAuth) {
+      await window.CWAuth.init();
+      window.CWAuth.onChange(spaceStatusRefresh);
+    }
     initSpace();
+    initAuth();
     if (window.CWCapture) {
       window.CWCapture.init(
         document.getElementById('btn-mic'),

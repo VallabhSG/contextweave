@@ -436,6 +436,20 @@ sup { font-size: 0.6em; }
 .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
 .btn-danger:hover { background: var(--danger); color: #fff; }
 
+/* ── SUPABASE SIGN-IN ── */
+.auth-box { margin-bottom: 4px; }
+.auth-fields { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.auth-input { flex: 1 1 200px; max-width: 280px; font-size: 0.85rem; }
+.auth-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 18px 0 14px;
+  font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-3);
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
 /* ── VOICE CAPTURE ── */
 .ingest-actions { display: flex; gap: 10px; align-items: center; }
 .mic-btn.recording {

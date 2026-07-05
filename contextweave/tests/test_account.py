@@ -97,3 +97,35 @@ class TestDataControl:
             assert section in data
         assert len(data["memories"]) == 1
         assert "entities" in data["graph"]
+
+
+class TestAuthConfig:
+    """GET /api/auth/config — frontend discovery of the Supabase project."""
+
+    def test_disabled_when_not_configured(self, client):
+        body = client.get("/api/auth/config").json()
+        assert body["supabase"]["enabled"] is False
+        assert "url" not in body["supabase"]
+        assert "anon_key" not in body["supabase"]
+
+    def test_exposes_public_config_when_fully_configured(self, client, monkeypatch):
+        from contextweave.config import settings
+
+        monkeypatch.setattr(settings, "supabase_url", "https://abc.supabase.co")
+        monkeypatch.setattr(settings, "supabase_anon_key", "anon-public-key")
+        monkeypatch.setattr(settings, "supabase_jwt_secret", "s3cret")
+        body = client.get("/api/auth/config").json()
+        assert body["supabase"] == {
+            "enabled": True,
+            "url": "https://abc.supabase.co",
+            "anon_key": "anon-public-key",
+        }
+
+    def test_disabled_without_jwt_secret(self, client, monkeypatch):
+        # Sign-in is pointless if the API cannot verify the session tokens
+        from contextweave.config import settings
+
+        monkeypatch.setattr(settings, "supabase_url", "https://abc.supabase.co")
+        monkeypatch.setattr(settings, "supabase_anon_key", "anon-public-key")
+        body = client.get("/api/auth/config").json()
+        assert body["supabase"]["enabled"] is False

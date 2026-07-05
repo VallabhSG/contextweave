@@ -29,7 +29,8 @@ SECURITY_HEADERS = {
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src https://fonts.gstatic.com; "
         "img-src 'self' data:; "
-        "connect-src 'self'; "
+        # *.supabase.co: the browser talks to Supabase Auth directly on sign-in
+        "connect-src 'self' https://*.supabase.co; "
         "object-src 'none'; "
         "base-uri 'self'; "
         "frame-ancestors 'none'"

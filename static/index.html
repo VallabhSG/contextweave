@@ -216,15 +216,25 @@
     <p class="section-label"><span class="section-num">05</span> Your space</p>
     <h2 class="section-title">Your data,<br><em>your control.</em></h2>
     <p class="section-desc">
-      By default you're in the shared public demo space. Create a private space to get an API key — your memories become yours alone, exportable and erasable at any time.
+      By default you're in the shared public demo space. Sign in — or create a private space with an API key — and your memories become yours alone, exportable and erasable at any time.
     </p>
     <div class="space-panel">
       <p class="space-status" id="space-status">Public demo space</p>
+      <div class="auth-box hidden" id="auth-box">
+        <div class="auth-fields">
+          <input type="email" id="auth-email" class="query-input auth-input" placeholder="you@example.com" autocomplete="email" />
+          <input type="password" id="auth-password" class="query-input auth-input" placeholder="password" autocomplete="current-password" />
+          <button class="btn btn-primary" id="btn-sign-in">Sign in</button>
+          <button class="btn btn-secondary" id="btn-sign-up">Create account</button>
+        </div>
+        <p class="auth-divider"><span>or use an API key</span></p>
+      </div>
       <div class="space-actions">
         <button class="btn btn-primary" id="btn-create-space">Create private space</button>
         <input type="text" id="key-input" class="query-input key-input" placeholder="cw_… paste an existing key" />
         <button class="btn btn-secondary" id="btn-use-key">Use key</button>
         <button class="btn btn-secondary hidden" id="btn-leave-space">Leave space</button>
+        <button class="btn btn-secondary hidden" id="btn-sign-out">Sign out</button>
         <button class="btn btn-secondary" id="btn-export">Export JSON</button>
         <button class="btn btn-danger hidden" id="btn-wipe">Wipe memory</button>
       </div>
@@ -254,6 +264,8 @@
   </footer>
 
   <div class="toast-container" id="toast-container"></div>
+  <script src="/static/vendor/supabase.js"></script>
+  <script src="/static/auth.js"></script>
   <script src="/static/capture.js"></script>
   <script src="/static/app.js"></script>
 </body>

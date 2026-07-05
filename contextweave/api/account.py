@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from contextweave.api.deps import get_workspace
 from contextweave.api.rate_limit import limiter
 from contextweave.auth.users import get_user_store
+from contextweave.config import settings
 from contextweave.workspaces import Workspace
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,28 @@ def register(request: Request, req: RegisterRequest | None = None):
             "Store this key now — it is shown only once. "
             "Send it as an X-API-Key header on every request."
         ),
+    }
+
+
+@router.get("/auth/config")
+def auth_config():
+    """Public auth discovery for the web UI.
+
+    The Supabase URL and anon key are public by design (they ship in every
+    Supabase frontend); sign-in is only offered when the backend also holds
+    the JWT secret needed to verify the resulting session tokens.
+    """
+    enabled = bool(
+        settings.supabase_url and settings.supabase_anon_key and settings.supabase_jwt_secret
+    )
+    if not enabled:
+        return {"supabase": {"enabled": False}}
+    return {
+        "supabase": {
+            "enabled": True,
+            "url": settings.supabase_url,
+            "anon_key": settings.supabase_anon_key,
+        }
     }
 
 
