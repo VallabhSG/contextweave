@@ -121,12 +121,37 @@ class HybridRetriever:
                     },
                 }
 
-        # Graph boost
+        # Graph results — boost chunks other signals found, and pull in
+        # connected chunks they missed (this is what "connects the dots":
+        # a chunk with no lexical or semantic overlap still surfaces when
+        # it shares entities with the ones that matched)
+        added_from_graph = 0
         for chunk_id in graph_chunk_ids:
             if chunk_id in scored:
                 scored[chunk_id]["graph_score"] = 0.3
+                continue
+            if added_from_graph >= 50:
+                continue
+            chunk = self.memory_store.get_chunk(chunk_id)
+            if chunk is None:
+                continue
+            added_from_graph += 1
+            scored[chunk_id] = {
+                "chunk_id": chunk_id,
+                "content": chunk.content,
+                "vector_score": 0.0,
+                "fts_score": 0.0,
+                "graph_score": 0.3,
+                "metadata": {
+                    "source": chunk.source.value,
+                    "timestamp": chunk.timestamp.isoformat(),
+                    "entities": ",".join(chunk.entities),
+                },
+            }
 
         # 5. Compute final scores
+        access_counts = self.memory_store.access_counts_by_chunk()
+
         results = []
         for item in scored.values():
             # Weighted fusion: 50% vector + 30% FTS + 20% graph
@@ -134,13 +159,14 @@ class HybridRetriever:
                 0.5 * item["vector_score"] + 0.3 * item["fts_score"] + 0.2 * item["graph_score"]
             )
 
-            # Apply temporal decay
+            # Apply temporal decay, access-frequency boost, and connection boost
             ts = self._parse_timestamp(item["metadata"].get("timestamp", ""))
             entities = [e for e in item["metadata"].get("entities", "").split(",") if e.strip()]
             conn_count = sum(self.knowledge_graph.connection_count(e) for e in entities)
             importance = self.scorer.score(
                 base_importance=combined,
                 timestamp=ts,
+                access_count=access_counts.get(item["chunk_id"], 0),
                 connection_count=conn_count,
             )
 

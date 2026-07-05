@@ -245,6 +245,18 @@ class MemoryStore:
                 (utcnow().isoformat(), f'%"{chunk_id}"%'),
             )
 
+    def access_counts_by_chunk(self) -> dict[str, int]:
+        """Map chunk_id → accumulated access count of the memories containing it."""
+        counts: dict[str, int] = {}
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT chunk_ids, access_count FROM memories WHERE access_count > 0"
+            ).fetchall()
+        for row in rows:
+            for chunk_id in json.loads(row["chunk_ids"]):
+                counts[chunk_id] = counts.get(chunk_id, 0) + row["access_count"]
+        return counts
+
     def list_most_accessed(self, limit: int = 20) -> list[Memory]:
         """Return memories ordered by access frequency."""
         with self._conn() as conn:
