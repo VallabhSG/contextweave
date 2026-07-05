@@ -25,7 +25,11 @@ class TestSecurityHeaders:
         r = client.get("/")
         assert r.status_code == 200
         assert "Content-Security-Policy" in r.headers
-        assert "script-src 'self'" in r.headers["Content-Security-Policy"]
+        csp = r.headers["Content-Security-Policy"]
+        assert "script-src 'self'" in csp
+        # HF Spaces renders the app inside an iframe on huggingface.co;
+        # 'none' here makes the Space page show "refused to connect".
+        assert "frame-ancestors 'self' https://huggingface.co" in csp
         assert r.headers["X-Content-Type-Options"] == "nosniff"
         assert "Referrer-Policy" in r.headers
 

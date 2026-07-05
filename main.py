@@ -33,7 +33,9 @@ SECURITY_HEADERS = {
         "connect-src 'self' https://*.supabase.co; "
         "object-src 'none'; "
         "base-uri 'self'; "
-        "frame-ancestors 'none'"
+        # huggingface.co must be allowed to frame us or the Space page
+        # (which embeds the app in an iframe) shows "refused to connect"
+        "frame-ancestors 'self' https://huggingface.co"
     ),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
