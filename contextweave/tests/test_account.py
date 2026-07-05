@@ -121,6 +121,17 @@ class TestAuthConfig:
             "anon_key": "anon-public-key",
         }
 
+    def test_url_normalized_to_project_base(self, client, monkeypatch):
+        # Dashboards surface the REST endpoint prominently; people paste it.
+        # supabase-js needs the bare project URL.
+        from contextweave.config import settings
+
+        monkeypatch.setattr(settings, "supabase_url", "https://abc.supabase.co/rest/v1/")
+        monkeypatch.setattr(settings, "supabase_anon_key", "anon-public-key")
+        monkeypatch.setattr(settings, "supabase_jwt_secret", "s3cret")
+        body = client.get("/api/auth/config").json()
+        assert body["supabase"]["url"] == "https://abc.supabase.co"
+
     def test_disabled_without_jwt_secret(self, client, monkeypatch):
         # Sign-in is pointless if the API cannot verify the session tokens
         from contextweave.config import settings

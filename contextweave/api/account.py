@@ -1,6 +1,7 @@
 """Account, privacy, and data-control endpoints."""
 
 import logging
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -38,6 +39,17 @@ def register(request: Request, req: RegisterRequest | None = None):
     }
 
 
+def _supabase_base_url(url: str) -> str:
+    """Reduce a pasted Supabase URL to the project base supabase-js expects.
+
+    The dashboard surfaces per-service endpoints (…/rest/v1, …/auth/v1)
+    prominently, so that is what people configure; the client appends the
+    service paths itself.
+    """
+    url = url.strip().rstrip("/")
+    return re.sub(r"/(rest|auth|realtime|storage|functions)/v\d+$", "", url)
+
+
 @router.get("/auth/config")
 def auth_config():
     """Public auth discovery for the web UI.
@@ -54,7 +66,7 @@ def auth_config():
     return {
         "supabase": {
             "enabled": True,
-            "url": settings.supabase_url,
+            "url": _supabase_base_url(settings.supabase_url),
             "anon_key": settings.supabase_anon_key,
         }
     }
