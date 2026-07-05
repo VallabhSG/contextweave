@@ -107,7 +107,8 @@ def pg_client(pg_url, tmp_path, monkeypatch):
     with get_pool().connection() as conn:
         conn.execute(
             "TRUNCATE cw_events, cw_chunks, cw_memories, cw_digests, "
-            "cw_entities, cw_entity_edges, cw_entity_chunks, cw_users"
+            "cw_entities, cw_entity_edges, cw_entity_chunks, cw_users, "
+            "cw_digest_subscriptions"
         )
 
     from main import app

@@ -30,6 +30,16 @@ class Settings(BaseSettings):
 
     digest_cache_hours: float = 12.0
 
+    # Pushed daily digest: any SMTP provider (Gmail app password, Resend,
+    # Mailgun, …). Delivery is off until smtp_host is set.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    digest_from_email: str = ""  # defaults to smtp_username when empty
+    # Absolute origin used to build unsubscribe links in emails
+    public_base_url: str = ""
+
     chunk_max_tokens: int = 512
     chunk_overlap_sentences: int = 2
     embedding_dimension: int = 384

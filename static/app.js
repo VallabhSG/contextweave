@@ -564,6 +564,7 @@
     if (health && health.entities > 0) loadEntities();
     document.getElementById('btn-load-entities')
       .classList.toggle('hidden', !!(health && health.entities > 0));
+    loadDigestSub();
     return health;
   }
 
@@ -642,6 +643,65 @@
     });
 
     document.getElementById('btn-refresh-nudge').addEventListener('click', () => loadDigest(true));
+  }
+
+  // ── DAILY DIGEST EMAIL ───────────────────────────────────────
+  function isPrivateSpace() {
+    return !!((window.CWAuth && window.CWAuth.email()) || localStorage.getItem('cw_api_key'));
+  }
+
+  async function loadDigestSub() {
+    const box = document.getElementById('digest-sub');
+    if (!box) return;
+    if (!isPrivateSpace()) { box.classList.add('hidden'); return; }
+    try {
+      const s = await api.get('/api/digest/subscription');
+      if (!s.available) { box.classList.add('hidden'); return; }
+      box.classList.remove('hidden');
+      const note = document.getElementById('digest-sub-note');
+      const emailInput = document.getElementById('digest-email');
+      document.getElementById('btn-digest-unsubscribe').classList.toggle('hidden', !s.subscribed);
+      if (s.subscribed) {
+        note.textContent = `Daily nudge goes to ${s.email} around ${String(s.send_hour_utc).padStart(2, '0')}:00 UTC.`;
+        if (!emailInput.value) emailInput.value = s.email;
+      } else {
+        note.textContent = 'One email a day: your focus, commitments, and what’s slipping.';
+        const signedIn = window.CWAuth && window.CWAuth.email();
+        if (signedIn && !emailInput.value) emailInput.value = signedIn;
+      }
+    } catch {
+      box.classList.add('hidden');
+    }
+  }
+
+  function initDigestSub() {
+    if (!document.getElementById('digest-sub')) return;
+
+    document.getElementById('btn-digest-subscribe').addEventListener('click', async () => {
+      const email = document.getElementById('digest-email').value.trim();
+      if (!email) { toast('Enter an email address first.', 'error'); return; }
+      // aim for ~8am in the visitor's timezone, expressed as a UTC hour
+      const tzHours = Math.round(-new Date().getTimezoneOffset() / 60);
+      const sendHour = ((8 - tzHours) % 24 + 24) % 24;
+      try {
+        await api.post('/api/digest/subscribe', { email, send_hour_utc: sendHour });
+        toast('Subscribed — your first digest arrives tomorrow morning.', 'success', 6000);
+        await loadDigestSub();
+      } catch (e) {
+        toast(`Could not subscribe: ${e.message}`, 'error');
+      }
+    });
+
+    document.getElementById('btn-digest-unsubscribe').addEventListener('click', async () => {
+      try {
+        const r = await fetch(BASE + '/api/digest/subscribe', { method: 'DELETE', headers: authHeaders() });
+        if (!r.ok) throw new Error(r.statusText);
+        toast('Daily digest emails stopped.', 'info');
+        await loadDigestSub();
+      } catch (e) {
+        toast(`Could not unsubscribe: ${e.message}`, 'error');
+      }
+    });
   }
 
   // ── SUPABASE SIGN-IN ─────────────────────────────────────────
@@ -757,6 +817,7 @@
     }
     initSpace();
     initAuth();
+    initDigestSub();
     if (window.CWCapture) {
       window.CWCapture.init(
         document.getElementById('btn-mic'),

@@ -450,6 +450,10 @@ sup { font-size: 0.6em; }
   content: ''; flex: 1; height: 1px; background: var(--border);
 }
 
+/* ── DAILY DIGEST EMAIL ── */
+.digest-sub { margin-top: 6px; }
+.digest-sub-note { margin-top: 10px; font-size: 0.8rem; color: var(--text-3); }
+
 /* ── VOICE CAPTURE ── */
 .ingest-actions { display: flex; gap: 10px; align-items: center; }
 .mic-btn.recording {

@@ -162,7 +162,7 @@ Six query types automatically detected from query keywords:
 |---|---|
 | Everything connects | Knowledge graph + hybrid retrieval (vector 50% · FTS 30% · graph 20%) with temporal decay |
 | A companion that remembers | Events → chunks → scored memories, with access-frequency and connection boosts |
-| Proactive nudges | `GET /api/digest` — cached daily digest of focus, commitments, and slipping threads, surfaced automatically in the UI |
+| Proactive nudges | `GET /api/digest` — cached daily digest of focus, commitments, and slipping threads, surfaced in the UI — and **pushed by email**: opt in via `POST /api/digest/subscribe` (or the Space panel) and an hourly scheduler mails your nudge at your chosen hour, with one-click unsubscribe. Enable by setting `CW_SMTP_HOST/PORT/USERNAME/PASSWORD` (any SMTP provider) and `CW_PUBLIC_BASE_URL` |
 | Ambient capture | 🎙 web Listen button (Web Speech API), `POST /api/ingest/audio` (Groq Whisper transcription), and an Expo iPhone/Android companion app ([`mobile/`](mobile/)) that records in 45s segments while you live your life |
 | Privacy: your data, your control | Private workspaces via `POST /api/auth/register` (or Supabase sign-in) — isolated storage per user, full `GET /api/export`, `DELETE /api/memory` |
 

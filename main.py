@@ -1,5 +1,6 @@
 """ContextWeave — Personal Long-Term Memory & Context Engine."""
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -63,7 +64,21 @@ async def lifespan(app: FastAPI):
         settings.sqlite_db_path,
         settings.chroma_persist_dir,
     )
+
+    from contextweave.notify import mailer
+    from contextweave.notify.scheduler import scheduler_loop
+
+    digest_task = None
+    if mailer.smtp_configured():
+        digest_task = asyncio.create_task(scheduler_loop())
+        logger.info("Pushed daily digest enabled — hourly delivery sweep scheduled")
+    else:
+        logger.info("CW_SMTP_HOST not set — pushed digests disabled (pull via /api/digest)")
+
     yield
+
+    if digest_task:
+        digest_task.cancel()
 
 
 app = FastAPI(

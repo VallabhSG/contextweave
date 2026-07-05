@@ -150,6 +150,15 @@ CREATE TABLE IF NOT EXISTS cw_users (
     name TEXT DEFAULT '',
     created_at TIMESTAMP NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS cw_digest_subscriptions (
+    user_id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    send_hour_utc INTEGER NOT NULL,
+    unsubscribe_token TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL,
+    last_sent_on TEXT
+);
 """
 
 
@@ -771,3 +780,66 @@ class PgUserStore:
                 "SELECT id FROM cw_users WHERE api_key_hash = %s", (key_hash,)
             ).fetchone()
         return row["id"] if row else None
+
+
+# ── Digest subscriptions ─────────────────────────────────────
+
+
+class PgSubscriptionStore:
+    """Postgres twin of notify.subscriptions.SubscriptionStore."""
+
+    def __init__(self):
+        self._pool = get_pool()
+
+    def subscribe(self, user_id: str, email: str, send_hour_utc: int) -> str:
+        token = secrets.token_urlsafe(24)
+        with self._pool.connection() as conn:
+            conn.execute(
+                "INSERT INTO cw_digest_subscriptions "
+                "(user_id, email, send_hour_utc, unsubscribe_token, created_at) "
+                "VALUES (%s, %s, %s, %s, %s) "
+                "ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, "
+                "send_hour_utc = EXCLUDED.send_hour_utc, "
+                "unsubscribe_token = EXCLUDED.unsubscribe_token",
+                (user_id, email, send_hour_utc, token, utcnow()),
+            )
+        return token
+
+    def unsubscribe(self, user_id: str) -> bool:
+        with self._pool.connection() as conn:
+            cur = conn.execute("DELETE FROM cw_digest_subscriptions WHERE user_id = %s", (user_id,))
+        return cur.rowcount > 0
+
+    def unsubscribe_by_token(self, token: str) -> bool:
+        if not token:
+            return False
+        with self._pool.connection() as conn:
+            cur = conn.execute(
+                "DELETE FROM cw_digest_subscriptions WHERE unsubscribe_token = %s", (token,)
+            )
+        return cur.rowcount > 0
+
+    def get(self, user_id: str) -> dict | None:
+        with self._pool.connection() as conn:
+            row = conn.execute(
+                "SELECT email, send_hour_utc, unsubscribe_token, last_sent_on "
+                "FROM cw_digest_subscriptions WHERE user_id = %s",
+                (user_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def due(self, hour_utc: int, today_iso: str) -> list[dict]:
+        with self._pool.connection() as conn:
+            rows = conn.execute(
+                "SELECT user_id, email, unsubscribe_token FROM cw_digest_subscriptions "
+                "WHERE send_hour_utc = %s AND (last_sent_on IS NULL OR last_sent_on != %s)",
+                (hour_utc, today_iso),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def mark_sent(self, user_id: str, today_iso: str) -> None:
+        with self._pool.connection() as conn:
+            conn.execute(
+                "UPDATE cw_digest_subscriptions SET last_sent_on = %s WHERE user_id = %s",
+                (today_iso, user_id),
+            )
