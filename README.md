@@ -256,10 +256,13 @@ CW_DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.po
 ```
 
 To let people sign in with Supabase Auth (Google, email magic links, …) instead of managing
-raw API keys, also set the JWT secret from **Dashboard → Settings → API → JWT Secret**:
+raw API keys: projects on the modern signing-keys system (any recently created project,
+ES256/RS256) are verified automatically via the project's JWKS endpoint — `CW_SUPABASE_URL`
+is all that's needed. Only legacy HS256 projects must additionally set the shared secret
+from **Dashboard → Settings → API → JWT Secret**:
 
 ```bash
-CW_SUPABASE_JWT_SECRET=<your-jwt-secret>
+CW_SUPABASE_JWT_SECRET=<your-jwt-secret>   # legacy HS256 projects only
 ```
 
 A Supabase session token then works anywhere an API key does, and every auth user gets a

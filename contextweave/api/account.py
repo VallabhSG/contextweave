@@ -1,13 +1,13 @@
 """Account, privacy, and data-control endpoints."""
 
 import logging
-import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from contextweave.api.deps import get_workspace
 from contextweave.api.rate_limit import limiter
+from contextweave.auth.supabase import supabase_base_url
 from contextweave.auth.users import get_user_store
 from contextweave.config import settings
 from contextweave.workspaces import Workspace
@@ -39,34 +39,21 @@ def register(request: Request, req: RegisterRequest | None = None):
     }
 
 
-def _supabase_base_url(url: str) -> str:
-    """Reduce a pasted Supabase URL to the project base supabase-js expects.
-
-    The dashboard surfaces per-service endpoints (…/rest/v1, …/auth/v1)
-    prominently, so that is what people configure; the client appends the
-    service paths itself.
-    """
-    url = url.strip().rstrip("/")
-    return re.sub(r"/(rest|auth|realtime|storage|functions)/v\d+$", "", url)
-
-
 @router.get("/auth/config")
 def auth_config():
     """Public auth discovery for the web UI.
 
     The Supabase URL and anon key are public by design (they ship in every
-    Supabase frontend); sign-in is only offered when the backend also holds
-    the JWT secret needed to verify the resulting session tokens.
+    Supabase frontend). The URL doubles as the trusted JWKS source, so it is
+    enough to verify modern (asymmetric) session tokens; legacy HS256
+    projects must additionally set CW_SUPABASE_JWT_SECRET.
     """
-    enabled = bool(
-        settings.supabase_url and settings.supabase_anon_key and settings.supabase_jwt_secret
-    )
-    if not enabled:
+    if not (settings.supabase_url and settings.supabase_anon_key):
         return {"supabase": {"enabled": False}}
     return {
         "supabase": {
             "enabled": True,
-            "url": _supabase_base_url(settings.supabase_url),
+            "url": supabase_base_url(),
             "anon_key": settings.supabase_anon_key,
         }
     }
