@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from contextweave.api.deps import get_workspace
 from contextweave.api.rate_limit import limiter
-from contextweave.auth.users import UserStore
+from contextweave.auth.users import get_user_store
 from contextweave.workspaces import Workspace
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class RegisterRequest(BaseModel):
 @limiter.limit(REGISTER_LIMIT)
 def register(request: Request, req: RegisterRequest | None = None):
     """Create a private workspace; the API key is returned exactly once."""
-    user_id, api_key = UserStore().create_user(name=req.name if req else "")
+    user_id, api_key = get_user_store().create_user(name=req.name if req else "")
     logger.info("Registered private workspace %s", user_id)
     return {
         "user_id": user_id,

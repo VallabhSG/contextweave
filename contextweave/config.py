@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     sqlite_db_path: str = "./contextweave.db"
     data_dir: str = "./data"
 
+    # Postgres + pgvector (e.g. Supabase). When set, replaces SQLite,
+    # ChromaDB, and the local user registry with one external database.
+    database_url: str = ""
+    # Supabase Auth: project JWT secret; enables sign-in tokens alongside cw_ keys
+    supabase_jwt_secret: str = ""
+
     digest_cache_hours: float = 12.0
 
     chunk_max_tokens: int = 512

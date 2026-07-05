@@ -86,18 +86,30 @@ class WorkspaceManager:
             if ws is not None:
                 return ws
 
-            if user_id == DEMO_USER_ID:
-                db_path = settings.sqlite_db_path
-                collection = "chunks"
-            else:
-                user_dir = Path(settings.data_dir) / "users" / user_id
-                user_dir.mkdir(parents=True, exist_ok=True)
-                db_path = str(user_dir / "contextweave.db")
-                collection = f"u_{user_id}"
+            if settings.database_url:
+                # Postgres + pgvector: one external database, tenant per user_id
+                from contextweave.storage.postgres import (
+                    PgKnowledgeGraph,
+                    PgMemoryStore,
+                    PgVectorStore,
+                )
 
-            memory_store = MemoryStore(db_path=db_path)
-            vector_store = VectorStore(collection_name=collection)
-            knowledge_graph = KnowledgeGraph(db_path=db_path)
+                memory_store = PgMemoryStore(user_id)
+                vector_store = PgVectorStore(user_id)
+                knowledge_graph = PgKnowledgeGraph(user_id)
+            else:
+                if user_id == DEMO_USER_ID:
+                    db_path = settings.sqlite_db_path
+                    collection = "chunks"
+                else:
+                    user_dir = Path(settings.data_dir) / "users" / user_id
+                    user_dir.mkdir(parents=True, exist_ok=True)
+                    db_path = str(user_dir / "contextweave.db")
+                    collection = f"u_{user_id}"
+
+                memory_store = MemoryStore(db_path=db_path)
+                vector_store = VectorStore(collection_name=collection)
+                knowledge_graph = KnowledgeGraph(db_path=db_path)
             ws = Workspace(
                 user_id=user_id,
                 memory_store=memory_store,
@@ -121,10 +133,16 @@ class WorkspaceManager:
             return ws
 
     def reset(self) -> None:
-        """Testing hook: drop cached workspaces and shared components."""
+        """Testing hook: drop cached workspaces, shared components, and DB pool."""
         with self._lock:
             self._workspaces.clear()
             self._shared = None
+        try:
+            from contextweave.storage import postgres
+
+            postgres.reset_pool()
+        except ImportError:  # psycopg not installed — SQLite-only environment
+            pass
 
 
 manager = WorkspaceManager()

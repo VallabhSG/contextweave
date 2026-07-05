@@ -118,6 +118,12 @@ connection_boost = 1 + connection_count × 0.3
 - Edges: co-occurrence edges between entities in the same chunk
 - Enables N-hop traversal to expand retrieval context
 
+**Postgres mode (optional)** — set `CW_DATABASE_URL` and all three stores collapse into a
+single Postgres + pgvector database: `vector(384)` embeddings, `tsvector` full-text search,
+and plain entity/edge tables, multi-tenant by `user_id`. NetworkX stays as the in-RAM
+traversal cache, loaded from Postgres per workspace. See
+[Persistent storage & sign-in with Supabase](#persistent-storage--sign-in-with-supabase-optional).
+
 ### Retrieval
 
 **HybridRetriever** fuses three signals:
@@ -158,7 +164,7 @@ Six query types automatically detected from query keywords:
 | A companion that remembers | Events → chunks → scored memories, with access-frequency and connection boosts |
 | Proactive nudges | `GET /api/digest` — cached daily digest of focus, commitments, and slipping threads, surfaced automatically in the UI |
 | Ambient capture | 🎙 web Listen button (Web Speech API), `POST /api/ingest/audio` (Groq Whisper transcription), and an Expo iPhone/Android companion app ([`mobile/`](mobile/)) that records in 45s segments while you live your life |
-| Privacy: your data, your control | Private workspaces via `POST /api/auth/register` — isolated SQLite + vector collection per user, full `GET /api/export`, `DELETE /api/memory` |
+| Privacy: your data, your control | Private workspaces via `POST /api/auth/register` (or Supabase sign-in) — isolated storage per user, full `GET /api/export`, `DELETE /api/memory` |
 
 Without an API key you're in the **shared public demo space**. With one, every request routes to your own isolated workspace.
 
@@ -231,6 +237,40 @@ python -m uvicorn main:app --reload
 ```
 
 API docs available at `http://localhost:8000/docs`
+
+### Persistent storage & sign-in with Supabase (optional)
+
+By default everything lives on local disk (SQLite + Chroma) — perfect for a laptop, but on
+ephemeral hosts like HuggingFace Spaces the disk is wiped on every restart. Point
+`CW_DATABASE_URL` at any Postgres with pgvector — a free [Supabase](https://supabase.com)
+project works — and all state (memories, vectors, graph, API keys, digests) moves into that
+one database and survives restarts and redeploys.
+
+1. Create a Supabase project (free tier is enough).
+2. Dashboard → **Connect** → copy the **Transaction pooler** connection string (port 6543).
+3. Set it as `CW_DATABASE_URL`. Tables and the pgvector extension are created automatically
+   on first start — no migrations to run.
+
+```bash
+CW_DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
+```
+
+To let people sign in with Supabase Auth (Google, email magic links, …) instead of managing
+raw API keys, also set the JWT secret from **Dashboard → Settings → API → JWT Secret**:
+
+```bash
+CW_SUPABASE_JWT_SECRET=<your-jwt-secret>
+```
+
+A Supabase session token then works anywhere an API key does, and every auth user gets a
+stable private workspace (`cw_*` keys keep working alongside):
+
+```bash
+curl https://your-host/api/me -H "Authorization: Bearer <supabase-access-token>"
+```
+
+**On HuggingFace Spaces:** add both values under **Settings → Variables and secrets** as
+*secrets*. Never commit them to the repo.
 
 ---
 

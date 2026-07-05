@@ -72,3 +72,12 @@ class UserStore:
                 "SELECT id FROM users WHERE api_key_hash = ?", (_hash_key(api_key),)
             ).fetchone()
         return row["id"] if row else None
+
+
+def get_user_store():
+    """Registry matching the active storage backend (Postgres or SQLite)."""
+    if settings.database_url:
+        from contextweave.storage.postgres import PgUserStore
+
+        return PgUserStore()
+    return UserStore()
