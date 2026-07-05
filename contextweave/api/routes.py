@@ -10,13 +10,15 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from contextweave.api.account import router as account_router
+from contextweave.api.audio import router as audio_router
 from contextweave.api.deps import get_workspace
 from contextweave.api.digest_routes import router as digest_router
+from contextweave.api.pipeline import IngestResponse, process_events
 from contextweave.api.rate_limit import BATCH_LIMIT, INGEST_LIMIT, QUERY_LIMIT, limiter
 from contextweave.ingestion.calendar_adapter import CalendarAdapter
 from contextweave.ingestion.chat_adapter import ChatAdapter
 from contextweave.ingestion.text_adapter import TextAdapter
-from contextweave.schemas import Memory, SourceType
+from contextweave.schemas import SourceType
 from contextweave.workspaces import Workspace, manager
 
 logger = logging.getLogger(__name__)
@@ -64,14 +66,6 @@ class QueryResponse(BaseModel):
     expanded_terms: list[str] = []
 
 
-class IngestResponse(BaseModel):
-    events_created: int = 0
-    chunks_created: int = 0
-    entities_extracted: int = 0
-    vectors_stored: int = 0
-    message: str = ""
-
-
 class HealthResponse(BaseModel):
     status: str = "ok"
     events: int = 0
@@ -108,7 +102,7 @@ async def ingest_file(
 
     try:
         events = await run_in_threadpool(adapter.ingest_file, tmp_path)
-        return await run_in_threadpool(_process_events, ws, events)
+        return await run_in_threadpool(process_events, ws, events)
     finally:
         tmp_path.unlink(missing_ok=True)
 
@@ -126,7 +120,7 @@ async def ingest_text(
 
     adapter = TextAdapter()
     events = adapter.ingest_text(req.content, metadata=req.metadata, source=source)
-    return await run_in_threadpool(_process_events, ws, events)
+    return await run_in_threadpool(process_events, ws, events)
 
 
 @router.post("/ingest/batch", response_model=IngestResponse)
@@ -165,77 +159,7 @@ async def ingest_batch(
         finally:
             tmp_path.unlink(missing_ok=True)
 
-    return await run_in_threadpool(_process_events, ws, total_events)
-
-
-def _process_events(ws: Workspace, events) -> IngestResponse:
-    """Shared pipeline: chunk → embed → extract entities → store."""
-    if not events:
-        return IngestResponse(message="No content extracted from input")
-
-    shared = manager.shared()
-    store = ws.memory_store
-    vstore = ws.vector_store
-    graph = ws.knowledge_graph
-
-    # Save raw events
-    store.save_events(events)
-
-    # Chunk
-    chunks = shared.chunker.chunk_events(events)
-
-    # Embed
-    chunks = shared.embedder.embed_chunks(chunks)
-
-    # Extract entities and attach to chunks
-    total_entities = 0
-    processed_chunks = []
-    for chunk in chunks:
-        entities = shared.extractor.extract_from_chunk(chunk)
-        entity_names = [e.name for e in entities]
-        chunk = chunk.model_copy(update={"entities": entity_names})
-        total_entities += len(entities)
-        processed_chunks.append(chunk)
-
-        # Update knowledge graph
-        if entities:
-            graph.add_entities(entities, chunk.id)
-
-        # Save chunk to SQLite
-        store.save_chunk(chunk)
-
-        # Create memory from chunk
-        importance = shared.scorer.estimate_base_importance(chunk.content, chunk.source.value)
-        memory = Memory(
-            chunk_ids=[chunk.id],
-            summary=chunk.content[:200],
-            entities=entity_names,
-            source=chunk.source,
-            timestamp=chunk.timestamp,
-            importance=importance,
-        )
-        store.save_memory(memory)
-
-    # Store embeddings in vector store (with entity metadata attached)
-    vectors_stored = vstore.add_chunks(processed_chunks)
-
-    if vectors_stored == 0:
-        logger.warning(
-            "No vectors stored for %d chunks — local fastembed embedding may be failing. "
-            "See /api/debug/status for diagnostics.",
-            len(processed_chunks),
-        )
-
-    return IngestResponse(
-        events_created=len(events),
-        chunks_created=len(chunks),
-        entities_extracted=total_entities,
-        vectors_stored=vectors_stored,
-        message=(
-            f"Ingested {len(events)} events into {len(chunks)} chunks "
-            f"({vectors_stored} vectors stored)"
-        ),
-    )
+    return await run_in_threadpool(process_events, ws, total_events)
 
 
 # ── Query Endpoints ─────────────────────────────────────────
@@ -488,4 +412,5 @@ def health(ws: Workspace = Depends(get_workspace)):
 # ── Sub-routers ─────────────────────────────────────────────
 
 router.include_router(account_router)
+router.include_router(audio_router)
 router.include_router(digest_router)

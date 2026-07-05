@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     reasoning_model: str = "llama-3.1-8b-instant"
     extraction_model: str = "llama-3.1-8b-instant"
+    transcription_model: str = "whisper-large-v3-turbo"
 
     chroma_persist_dir: str = "./chroma_data"
     sqlite_db_path: str = "./contextweave.db"
