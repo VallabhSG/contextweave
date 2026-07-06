@@ -30,8 +30,12 @@ class Settings(BaseSettings):
 
     digest_cache_hours: float = 12.0
 
-    # Pushed daily digest: any SMTP provider (Gmail app password, Resend,
-    # Mailgun, …). Delivery is off until smtp_host is set.
+    # Pushed daily digest. Two transports:
+    # - resend_api_key: HTTPS API — required on hosts that block SMTP
+    #   egress (HuggingFace Spaces does)
+    # - smtp_*: any SMTP provider, for self-hosted deployments
+    # Delivery is off until one of them is set.
+    resend_api_key: str = ""
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_username: str = ""

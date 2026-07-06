@@ -65,7 +65,7 @@ class SubscribeRequest(BaseModel):
 @router.get("/digest/subscription")
 def digest_subscription(ws: Workspace = Depends(get_workspace)):
     """Whether email delivery is available, and the caller's subscription."""
-    available = mailer.smtp_configured()
+    available = mailer.email_configured()
     sub = None if ws.is_demo else get_subscription_store().get(ws.user_id)
     if not sub:
         return {"available": available, "subscribed": False}
@@ -85,7 +85,7 @@ def subscribe_digest(
     """Opt in to the daily digest email for this workspace."""
     if ws.is_demo:
         raise HTTPException(403, "Register or sign in first — the demo space has no inbox.")
-    if not mailer.smtp_configured():
+    if not mailer.email_configured():
         raise HTTPException(503, "Email delivery is not configured on this server.")
     token = get_subscription_store().subscribe(ws.user_id, req.email, req.send_hour_utc)
     return {

@@ -1,4 +1,9 @@
-"""Digest email rendering and SMTP delivery (stdlib only, provider-agnostic)."""
+"""Digest email rendering and delivery.
+
+Two transports: the Resend HTTPS API (hosts like HF Spaces block SMTP
+egress at the network level — Errno 101 on port 587) and plain stdlib
+SMTP for self-hosted deployments. The API path wins when both are set.
+"""
 
 from __future__ import annotations
 
@@ -11,19 +16,45 @@ from contextweave.config import settings
 
 logger = logging.getLogger(__name__)
 
+RESEND_ENDPOINT = "https://api.resend.com/emails"
+# Resend's shared onboarding sender — works without a verified domain,
+# but then only delivers to the Resend account owner's own address.
+RESEND_DEFAULT_FROM = "ContextWeave <onboarding@resend.dev>"
 
-def smtp_configured() -> bool:
-    return bool(settings.smtp_host)
 
-
-def _from_address() -> str:
-    return settings.digest_from_email or settings.smtp_username
+def email_configured() -> bool:
+    return bool(settings.resend_api_key or settings.smtp_host)
 
 
 def send_email(to: str, subject: str, text: str, html: str) -> None:
     """Deliver one message; raises on failure so callers can react."""
+    if settings.resend_api_key:
+        _send_via_resend(to, subject, text, html)
+    else:
+        _send_via_smtp(to, subject, text, html)
+
+
+def _send_via_resend(to: str, subject: str, text: str, html: str) -> None:
+    import httpx
+
+    response = httpx.post(
+        RESEND_ENDPOINT,
+        json={
+            "from": settings.digest_from_email or RESEND_DEFAULT_FROM,
+            "to": [to],
+            "subject": subject,
+            "text": text,
+            "html": html,
+        },
+        headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+        timeout=30,
+    )
+    response.raise_for_status()
+
+
+def _send_via_smtp(to: str, subject: str, text: str, html: str) -> None:
     msg = EmailMessage()
-    msg["From"] = _from_address()
+    msg["From"] = settings.digest_from_email or settings.smtp_username
     msg["To"] = to
     msg["Subject"] = subject
     msg.set_content(text)

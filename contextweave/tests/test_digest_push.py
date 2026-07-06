@@ -41,6 +41,64 @@ def _register(client):
     return body["user_id"], {"X-API-Key": body["api_key"]}
 
 
+class TestResendTransport:
+    """HTTP delivery for hosts that block SMTP egress (e.g. HF Spaces)."""
+
+    def test_resend_key_alone_enables_delivery(self, monkeypatch):
+        from contextweave.notify import mailer
+
+        monkeypatch.setattr(settings, "smtp_host", "")
+        monkeypatch.setattr(settings, "resend_api_key", "re_test_123")
+        assert mailer.email_configured() is True
+
+    def test_send_goes_through_resend_api(self, monkeypatch):
+        from contextweave.notify import mailer
+
+        monkeypatch.setattr(settings, "smtp_host", "")
+        monkeypatch.setattr(settings, "resend_api_key", "re_test_123")
+        monkeypatch.setattr(settings, "digest_from_email", "")
+
+        captured = {}
+
+        class FakeResponse:
+            status_code = 200
+
+            def raise_for_status(self):
+                pass
+
+        def fake_post(url, json=None, headers=None, timeout=None):
+            captured.update({"url": url, "json": json, "headers": headers})
+            return FakeResponse()
+
+        import httpx
+
+        monkeypatch.setattr(httpx, "post", fake_post)
+        mailer.send_email("me@example.com", "Sub", "text body", "<p>html</p>")
+
+        assert captured["url"] == "https://api.resend.com/emails"
+        assert captured["headers"]["Authorization"] == "Bearer re_test_123"
+        assert captured["json"]["to"] == ["me@example.com"]
+        assert captured["json"]["subject"] == "Sub"
+        assert captured["json"]["html"] == "<p>html</p>"
+        # Resend's shared onboarding sender is the no-config default
+        assert captured["json"]["from"] == "ContextWeave <onboarding@resend.dev>"
+
+    def test_resend_error_raises(self, monkeypatch):
+        from contextweave.notify import mailer
+
+        monkeypatch.setattr(settings, "smtp_host", "")
+        monkeypatch.setattr(settings, "resend_api_key", "re_test_123")
+
+        import httpx
+
+        def fake_post(url, json=None, headers=None, timeout=None):
+            raise httpx.ConnectError("boom")
+
+        monkeypatch.setattr(httpx, "post", fake_post)
+        with pytest.raises(Exception):
+            mailer.send_email("me@example.com", "Sub", "t", "<p>h</p>")
+
+
 class TestSubscriptionEndpoints:
     def test_demo_space_cannot_subscribe(self, client, smtp_on):
         r = client.post("/api/digest/subscribe", json={"email": "a@b.co", "send_hour_utc": 3})

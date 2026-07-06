@@ -22,3 +22,6 @@ data/
 .claude
 node_modules/
 .expo/
+
+# local scratch files — never commit
+*.tmp

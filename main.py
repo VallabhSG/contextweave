@@ -69,11 +69,11 @@ async def lifespan(app: FastAPI):
     from contextweave.notify.scheduler import scheduler_loop
 
     digest_task = None
-    if mailer.smtp_configured():
+    if mailer.email_configured():
         digest_task = asyncio.create_task(scheduler_loop())
         logger.info("Pushed daily digest enabled — hourly delivery sweep scheduled")
     else:
-        logger.info("CW_SMTP_HOST not set — pushed digests disabled (pull via /api/digest)")
+        logger.info("No email transport configured — pushed digests disabled (pull via /api/digest)")
 
     yield
 

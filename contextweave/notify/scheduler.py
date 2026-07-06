@@ -30,7 +30,7 @@ def send_due_digests(now: datetime | None = None) -> int:
     Idempotent per day (last_sent_on guard), and one failing recipient
     never blocks the rest of the sweep.
     """
-    if not mailer.smtp_configured():
+    if not mailer.email_configured():
         return 0
     from contextweave.api.digest_routes import build_digest_payload
 
