@@ -230,8 +230,8 @@ Storage:
 - NetworkX + SQLite for the knowledge graph
 
 Processing:
-- Gemini text-embedding-004 for embeddings (768-dim, free tier: 1500 req/day)
-- Gemini gemini-2.0-flash for NER and reasoning (fast, cheap)
+- fastembed BAAI/bge-small-en-v1.5 for embeddings (384-dim, fully local, zero API cost)
+- Groq llama-3.1-8b-instant for NER and reasoning (free tier: 14,400 req/day)
 - SemanticChunker with 512-token max, 2-sentence overlap
 
 Retrieval:
@@ -311,22 +311,27 @@ To read:
 
 
 def ingest(entry: dict, idx: int) -> bool:
-    try:
-        r = httpx.post(
-            f"{BASE}/api/ingest/text",
-            json={"content": entry["content"], "metadata": entry.get("metadata", {})},
-            timeout=60,
-        )
-        if r.status_code == 200:
-            data = r.json()
-            print(f"  [{idx+1:02d}] ✓  {data['chunks_created']} chunks, {data['entities_extracted']} entities")
-            return True
-        else:
-            print(f"  [{idx+1:02d}] ✗  HTTP {r.status_code}: {r.text[:80]}")
+    for attempt in range(3):
+        try:
+            r = httpx.post(
+                f"{BASE}/api/ingest/text",
+                json={"content": entry["content"], "metadata": entry.get("metadata", {})},
+                timeout=60,
+            )
+            if r.status_code == 429:  # per-IP ingest limit — wait out the window
+                print(f"  [{idx+1:02d}] rate limited, waiting 65s (attempt {attempt+1}/3)")
+                time.sleep(65)
+                continue
+            if r.status_code == 200:
+                data = r.json()
+                print(f"  [{idx+1:02d}] ok    {data['chunks_created']} chunks, {data['entities_extracted']} entities")
+                return True
+            print(f"  [{idx+1:02d}] FAIL  HTTP {r.status_code}: {r.text[:80]}")
             return False
-    except Exception as e:
-        print(f"  [{idx+1:02d}] ✗  {e}")
-        return False
+        except Exception as e:
+            print(f"  [{idx+1:02d}] FAIL  {e}")
+            return False
+    return False
 
 
 def main():
@@ -345,7 +350,7 @@ def main():
         success = ingest(entry, i)
         if success:
             ok += 1
-        time.sleep(1.2)  # stay within Groq free-tier rate limits
+        time.sleep(6.5)  # the API rate-limits ingest to 10/minute per IP
 
     print(f"\nDone — {ok}/{len(ENTRIES)} entries ingested successfully.")
 
