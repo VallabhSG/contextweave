@@ -1,4 +1,10 @@
-"""Seed ContextWeave with realistic sample data."""
+"""Seed ContextWeave with realistic sample data.
+
+The demo persona is fictional: a founding engineer at a small studio
+building "Wayfarer", an offline-first hiking app. Entries interconnect
+(recurring people, projects, decisions) so the knowledge graph, digest,
+and cross-document queries all have something real to show.
+"""
 
 import httpx
 import time
@@ -8,304 +14,174 @@ BASE = "https://vallllllllll-contextweave.hf.space"
 ENTRIES = [
     # ── MEETINGS ────────────────────────────────────────────────
     {
-        "content": """Meeting with Pratyush and the Thine product team — March 12, 2026.
-Discussed the core challenge: most AI assistants have no memory of who you actually are.
-Pratyush walked through the vision: Thine should feel like a co-founder who's been with you since day one.
-Key decisions made:
-- Prioritize ambient capture over manual note-taking
-- iOS first, Android in Q3
-- Memory architecture needs temporal decay — recent context should outweigh older context
-- Action item: explore hybrid retrieval combining vector search + knowledge graph
-Follow-up: send architecture proposal by March 15.""",
-        "metadata": {"source": "meeting", "people": ["Pratyush", "Thine team"], "date": "2026-03-12"},
+        "content": """Kickoff meeting for Wayfarer v2 offline mode — March 9, 2026.
+Whole team in the room: Sam Okafor (backend), Lena Fischer (design), Ravi Menon (CTO).
+The problem: hikers lose signal exactly when they need the map most.
+Decisions:
+- Offline-first is the headline feature for v2, not an option buried in settings
+- Map tiles stored as MBTiles in SQLite on-device; sync over WiFi only by default
+- Ship Sierra and Cascades regions first, expand after launch
+Action items: Sam to prototype tile pre-fetch by March 20. Lena to sketch the download-region flow.
+I'll write the storage budget doc — how many GB is acceptable per region — by Friday.""",
+        "metadata": {"source": "meeting", "people": ["Sam Okafor", "Lena Fischer", "Ravi Menon"], "date": "2026-03-09"},
     },
     {
-        "content": """Weekly sync with Alice Chen (eng lead) — March 18, 2026.
-Alice flagged that ChromaDB cold-start latency is spiking on Render free tier (~30s first request).
-Options discussed:
-1. Keep SQLite FTS as a warm fallback while Chroma initialises
-2. Move to Render paid tier ($7/mo) — probably worth it for the demo
-3. Pre-warm with a health-check ping every 10 minutes via a cron job
-Decision: go with option 3 for now, revisit after demo.
-Alice also mentioned she's been reading the Memorize paper — the access-frequency boost idea came from there.""",
-        "metadata": {"source": "meeting", "people": ["Alice Chen"], "date": "2026-03-18"},
+        "content": """Weekly sync with Sam Okafor — March 23, 2026.
+Sam's tile pre-fetch prototype works but the numbers are rough: the full Sierra region is 4.1 GB at zoom 15.
+Options we discussed:
+1. Cap offline detail at zoom 13 (roughly 900 MB) and stream deeper zooms when online
+2. Let users draw a corridor around their planned route and only fetch that
+3. Both — corridor fetch with a zoom cap
+Decision: option 3. The corridor idea came from Elena Marsh's beta feedback — she only ever hikes planned routes.
+Sam raised a concern about Mapbox's offline tile licensing. Follow up with their sales team before we commit.""",
+        "metadata": {"source": "meeting", "people": ["Sam Okafor", "Elena Marsh"], "date": "2026-03-23"},
     },
     {
-        "content": """Design review with Marcus (product designer) — March 25, 2026.
-Marcus showed three directions for the ContextWeave UI:
-A) Dark, techy (feels like a dev tool)
-B) Light, editorial — closer to Thine's brand language
-C) Neutral minimal — safe but forgettable
-We all agreed B is the right call. The product is personal and human — the design should match.
-Marcus will prototype the Instrument Serif headline treatment and share by EOW.
-Key insight from Marcus: "The user shouldn't feel like they're querying a database. They should feel like they're talking to someone who knows them." """,
-        "metadata": {"source": "meeting", "people": ["Marcus"], "date": "2026-03-25"},
+        "content": """Design review with Lena Fischer — April 6, 2026.
+Lena presented three directions for the region-download flow:
+A) Checklist of named regions (simple, boring)
+B) Pinch-and-drag a rectangle on the map (flexible, fiddly on small screens)
+C) Tap your planned route, and Wayfarer computes the corridor automatically
+We picked C — it matches how hikers actually think. Nobody plans "a rectangle".
+Lena's insight: "The download screen is the moment users decide whether to trust the app with their safety. It should feel calm."
+She'll have an interactive prototype by end of week. I promised to get her real corridor-size numbers from Sam's branch.""",
+        "metadata": {"source": "meeting", "people": ["Lena Fischer", "Sam Okafor"], "date": "2026-04-06"},
     },
     {
-        "content": """1:1 with Rohan (CTO) — April 1, 2026.
-Rohan pushed back on the entity extraction approach — using Gemini for NER adds latency and cost.
-Counter-argument: the knowledge graph connections are what differentiate us from plain RAG.
-Without entity extraction, you can't do graph traversal, and without graph traversal you lose the 20% retrieval signal that catches cross-document connections.
-Rohan agreed to keep it but wants a regex fallback for when the LLM is slow.
-Also discussed: open-sourcing the memory core. Rohan thinks it could drive developer adoption.
-Decision: ship private demo first, evaluate open-source after Series A.""",
-        "metadata": {"source": "meeting", "people": ["Rohan"], "date": "2026-04-01"},
+        "content": """1:1 with Ravi Menon — April 14, 2026.
+Ravi pushed back on the Mapbox dependency. Their offline licensing quote came back at $18k/year minimum — brutal for a three-person studio.
+Counter-argument: Mapbox's rendering quality and terrain shading are genuinely better.
+Ravi's position: OpenStreetMap data with our own MBTiles pipeline gets us 90% of the quality at zero licensing cost, and we own the whole stack.
+We agreed to timebox a two-week OSM spike. If the terrain rendering looks acceptable on the Sierra test region, we drop Mapbox.
+Also discussed the App Store launch window: aim for the June hiking season, hard deadline June 12.""",
+        "metadata": {"source": "meeting", "people": ["Ravi Menon"], "date": "2026-04-14"},
     },
 
     # ── JOURNAL ENTRIES ─────────────────────────────────────────
     {
-        "content": """Journal — February 3, 2026.
-Started thinking seriously about the memory problem in AI today. Read three papers:
-- MemGPT (hierarchical memory management)
-- Generative Agents (Stanford — agents with believable daily routines from memory)
-- Memorize (access-frequency weighted recall)
-The common thread: naive RAG forgets. Top-K cosine search doesn't care if you accessed a memory 50 times or never. That's wrong.
-Your most-recalled memories should get a boost. Your recent decisions should outweigh older ones.
-I want to build something that gets smarter the longer you use it.""",
-        "metadata": {"source": "journal", "date": "2026-02-03"},
+        "content": """Journal — February 21, 2026.
+Went back through our support inbox from the winter. The same story keeps appearing with different names:
+someone downloads a trail map at the trailhead parking lot, loses signal two miles in, and the map goes blank at the fork.
+One user got genuinely lost for three hours above Emerald Basin.
+We keep polishing features for people sitting on their couch planning trips. The product moment that matters happens where there is no network at all.
+Wrote it on a sticky note above my desk: build for the person at the fork in the trail.""",
+        "metadata": {"source": "journal", "date": "2026-02-21"},
     },
     {
-        "content": """Journal — February 17, 2026.
-Had a long conversation with Dad tonight. He asked what I was building and I couldn't explain it simply.
-Eventually landed on: "It's like if your phone remembered every important conversation you ever had and could tell you what you'd forgotten."
-He said: "That's just a really good diary."
-Maybe he's right. But a diary doesn't answer back. Doesn't connect your conversation from three months ago to your goal from last week.
-The insight I keep coming back to: memory isn't storage. Memory is retrieval. The hard part isn't saving — it's knowing what to surface, and when.""",
-        "metadata": {"source": "journal", "date": "2026-02-17"},
+        "content": """Journal — March 30, 2026.
+The corridor-download idea is turning out to be the best decision of the quarter, and it wasn't ours — it came from Elena Marsh's feedback thread.
+She wrote: "I don't need the whole mountain range. I need my route plus the escape routes."
+That sentence reframed the entire storage problem. A 40-mile route corridor at high zoom is about 300 MB. The full region was 4 GB.
+Lesson I keep relearning: beta testers don't give you solutions, they give you constraints you didn't know existed. The solution falls out of the constraint.""",
+        "metadata": {"source": "journal", "date": "2026-03-30"},
     },
     {
-        "content": """Journal — March 5, 2026.
-Imposter syndrome hit hard today. Looked at the Rewind AI team — 40 engineers, $30M raised.
-Then looked at what I've built: 17 Python files, a SQLite database, and a FastAPI wrapper around three Google APIs.
-But then I ran a query: "What have I been learning about retrieval systems?"
-And it answered. Accurately. With citations from my own notes.
-Something clicked. The product actually works. Not at scale, not in production, but the core loop — ingest, store, retrieve, reason — is real.
-Reminded myself: Thine started as a weekend project too.""",
-        "metadata": {"source": "journal", "date": "2026-03-05"},
+        "content": """Journal — April 20, 2026.
+Week one of the OSM spike done. Honest assessment: the raw OpenStreetMap render looked flat and lifeless next to Mapbox — until Sam added hillshading from the USGS elevation tiles.
+With terrain shading it's suddenly 90% of the way there, exactly like Ravi predicted.
+The remaining gap is typography on trail labels, which Lena thinks she can fix with a custom style layer.
+Feeling good about dropping the $18k dependency. Owning the pipeline also means offline works exactly how we design it, not how a vendor's SDK allows it.""",
+        "metadata": {"source": "journal", "date": "2026-04-20"},
     },
     {
-        "content": """Journal — March 29, 2026.
-Shipped the hybrid retriever today. Three signals fused:
-- Vector similarity (ChromaDB cosine): 50%
-- Full-text search (SQLite FTS5): 30%
-- Knowledge graph traversal (NetworkX): 20%
-Then importance-reranked with temporal decay.
-Tested with 200 seeded entries. Query: "What did I decide about the architecture?"
-It returned the right meeting note from 6 weeks ago — ranked above a more recent but less relevant journal entry.
-The temporal decay + access boost is doing real work. Old but frequently recalled memories stay relevant.
-This is the part that makes it feel less like a search engine and more like a brain.""",
-        "metadata": {"source": "journal", "date": "2026-03-29"},
-    },
-    {
-        "content": """Journal — April 3, 2026.
-Applied to Thine today. Felt vulnerable attaching the GitHub link.
-The project is rough in places — no auth, cold-start latency, entity extraction is sometimes wrong.
-But it demonstrates the thing I believe: that personal memory is a systems problem, not a prompting problem.
-You can't prompt your way to good recall. You need the right retrieval architecture.
-I genuinely think the hybrid retriever + importance scoring approach is better than what most production memory systems do.
-Whether or not I get the job, I'll keep building this.""",
-        "metadata": {"source": "journal", "date": "2026-04-03"},
+        "content": """Journal — May 11, 2026.
+Battery testing week. Took Friday off and hiked the Basecamp Ridge loop with four phones in my pack, each running a different GPS sampling strategy.
+Results: continuous 1Hz GPS drained 31% over the four-hour loop. Adaptive sampling — 1Hz when moving fast or near forks, one fix per 30s on straight sections — drained 11%.
+The fork-detection heuristic Sam wrote (distance to nearest trail junction from the OSM graph) is what makes adaptive sampling safe.
+A hiker's phone dying at 2pm is a safety problem, not a UX problem. 11% feels shippable.""",
+        "metadata": {"source": "journal", "date": "2026-05-11"},
     },
 
     # ── LEARNING NOTES ──────────────────────────────────────────
     {
-        "content": """Learning notes: Vector databases deep-dive — February 8, 2026.
-Compared ChromaDB, Qdrant, Weaviate, Pinecone.
-ChromaDB: best for local/prototype, simple API, persistent on disk. Latency spikes on cold start.
-Qdrant: better production performance, filtering support, gRPC. More complex setup.
-Weaviate: hybrid search built-in (BM25 + vector). Interesting for our use case but heavy.
-Pinecone: fully managed, lowest operational overhead, but $20/mo minimum.
-Decision: ChromaDB for the demo (zero cost, easy setup), Qdrant for production.
-Key insight: HNSW indexing (Hierarchical Navigable Small World) is what makes ANN fast.
-O(log n) at query time instead of brute-force O(n). The graph structure allows efficient navigation through high-dimensional space.""",
-        "metadata": {"source": "note", "date": "2026-02-08"},
+        "content": """Learning notes: MBTiles and offline map storage — March 12, 2026.
+MBTiles is just SQLite with a convention: a tiles table keyed by zoom/column/row, blobs of PNG or vector data.
+Key facts:
+- Vector tiles are 5-10x smaller than raster for the same area, and restyle for free
+- Zoom 15 is where file size explodes: each zoom level roughly quadruples tile count
+- Deduplication matters: ocean and empty forest tiles are identical blobs, store once with a tile_ref indirection
+Rule of thumb from testing: vector corridor at zoom 15, 2km wide, is about 7 MB per trail mile.
+That number decides our whole download UX.""",
+        "metadata": {"source": "note", "date": "2026-03-12"},
     },
     {
-        "content": """Learning notes: Temporal reasoning in RAG — February 20, 2026.
-Most RAG papers optimise for relevance without considering time.
-Problems this causes:
-1. A decision you made last week should outweigh a preference you noted last year
-2. Frequently-accessed memories signal importance — retrieve them more
-3. Context evolves: what you believed about a topic in January might be wrong by April
-Approaches reviewed:
-- Time-weighted embedding: blend semantic similarity with recency score
-- Decay functions: exponential decay (half-life model) vs. linear decay
-- Access frequency boosting: multiplicative boost proportional to log(access_count + 1)
-Implemented: importance = base × exp(-ln(2) × days/30) × (1 + log(1+access) × 1.2)
-Half-life of 30 days means a memory loses half its recency weight in a month. Feels right.""",
-        "metadata": {"source": "note", "date": "2026-02-20"},
+        "content": """Learning notes: GPX parsing pitfalls — April 2, 2026.
+GPX is XML, and every device exports it slightly differently.
+Gotchas found while importing beta users' recorded tracks:
+- Garmin devices write extensions namespaces that break naive parsers
+- Some apps export trkpt without elevation; our elevation-gain math must fall back to the terrain model
+- Timestamps can be local time without offset — treat all bare timestamps as suspect
+- A single file can contain multiple trk segments after GPS dropouts; joining them naively creates teleport lines across valleys
+Decision: parse defensively, validate against the trail graph, and show users a preview before import.""",
+        "metadata": {"source": "note", "date": "2026-04-02"},
     },
     {
-        "content": """Learning notes: Knowledge graphs for RAG — March 2, 2026.
-Standard RAG misses cross-document connections. Example:
-- Document A mentions "Alice" and "Project Alpha"
-- Document B mentions "Project Alpha" risks
-- Query: "What should I know before talking to Alice?"
-Plain vector search won't connect Alice → Project Alpha → Project Alpha risks.
-Knowledge graph solution:
-1. Extract entities (NER) from each chunk
-2. Create co-occurrence edges: entities in same chunk get an edge
-3. At query time: retrieve via vector, then expand to connected entities, then retrieve their chunks too
-Implemented with NetworkX (in-memory) + SQLite (persistent edge store).
-2-hop traversal catches most useful connections without exploding the result set.""",
-        "metadata": {"source": "note", "date": "2026-03-02"},
+        "content": """Learning notes: OpenStreetMap trail data quality — April 25, 2026.
+Spent three days auditing OSM coverage for our launch regions.
+Findings:
+- Sierra coverage is excellent: 96% of official trails present, mostly accurate
+- Cascades are patchier: several decommissioned trails still mapped as active — a real safety issue
+- The sac_scale and trail_visibility tags are gold when present: they encode difficulty and how easy the path is to follow
+Plan: cross-check OSM against the ranger district's official GIS layers before marking any trail as verified in Wayfarer.
+Dana Whitfield at the Cascades ranger district offered to review our trail list — take her up on that.""",
+        "metadata": {"source": "note", "date": "2026-04-25"},
     },
     {
-        "content": """Learning notes: SQLite FTS5 full-text search — March 10, 2026.
-FTS5 is SQLite's built-in full-text search. Faster than LIKE, supports ranking.
-Key functions:
-- bm25(): BM25 ranking (better than TF-IDF for shorter documents)
-- highlight(): returns snippets with matched terms highlighted
-- snippet(): similar, more control over fragment length
-Gotcha discovered: FTS5 queries crash on special characters like *, (, ", :
-Fix: sanitise query with re.sub(r'["()*:]', ' ', query) before passing to FTS5.
-Also: MATCH queries are case-insensitive by default — good for user queries.
-Performance: FTS5 on 10k rows returns in <5ms. Vector search on same size: ~50ms.
-That's why FTS gets 30% weight — it's fast, precise for exact terms, and handles proper nouns well.""",
-        "metadata": {"source": "note", "date": "2026-03-10"},
-    },
-    {
-        "content": """Learning notes: Pydantic v2 migration notes — March 16, 2026.
-Migrating from Pydantic v1 to v2 — breaking changes:
-- @validator → @field_validator (different signature)
-- orm_mode = True → model_config = ConfigDict(from_attributes=True)
-- .dict() → .model_dump()
-- .json() → .model_dump_json()
-- frozen=True still works for immutable models (good)
-Performance improvement: v2 is ~5-50x faster for validation due to Rust core (pydantic-core).
-Gotcha: pydantic-core has no prebuilt wheel for Python 3.14. Must pin to Python 3.11 or 3.12 for production deployments (especially Render, Railway).
-Lesson: always pin Python version in .python-version file when deploying.""",
-        "metadata": {"source": "note", "date": "2026-03-16"},
+        "content": """Learning notes: on-device search for offline mode — May 4, 2026.
+Requirement: search trails, peaks, and waypoints with zero network.
+Evaluated: bundled SQLite FTS5 index vs a trie baked into the app binary.
+FTS5 won easily — 40k named features for the Sierra region indexes to 9 MB, queries return in under 5ms on a mid-range phone, and prefix matching (feature* ) gives type-ahead for free.
+Gotcha: FTS5 chokes on special characters in queries; sanitize before matching.
+Bonus discovery: bm25 ranking puts exact trail-name matches above partial peak-name matches with zero tuning. Shipping it as-is.""",
+        "metadata": {"source": "note", "date": "2026-05-04"},
     },
 
     # ── CONVERSATIONS ────────────────────────────────────────────
     {
-        "content": """Conversation with Sarah (friend, ML engineer at Google) — March 8, 2026.
-Sarah: "Why are you building this instead of just using Notion AI or ChatGPT memory?"
-Me: "Because those are prompt-level features. They don't actually think about retrieval."
-Sarah: "What do you mean?"
-Me: "ChatGPT memory is basically a summary injected into every prompt. It doesn't scale, it doesn't decay, it doesn't distinguish between important decisions and random notes."
-Sarah: "Fair. So what makes yours different?"
-Me: "The importance scorer. Every memory has a score that decays over time unless it gets accessed. Your brain does the same thing — things you think about often stay sharp."
-Sarah: "That's actually interesting. Have you read the Ebbinghaus forgetting curve literature?"
-Me: "Not deeply. Should I?"
-Sarah: "Yes. And look at spaced repetition too — Anki's algorithm is basically what you're describing but for learning."
-Added to reading list: Ebbinghaus forgetting curve, SM-2 spaced repetition algorithm.""",
-        "metadata": {"source": "conversation", "people": ["Sarah"], "date": "2026-03-08"},
+        "content": """Conversation with Dana Whitfield (Cascades district ranger) — May 8, 2026.
+Met Dana at the ranger station to talk trail data.
+Dana: "Apps are why we do more rescues now, not fewer. People trust a blue dot more than a paper map they'd actually study."
+Me: "What would make an app rescue-negative instead?"
+Dana: "Show decommissioned trails as gone. Show water sources as seasonal. And stop routing people over Windy Gap in June — it holds snow until July."
+We agreed: Dana's team reviews our Cascades trail list before launch, and Wayfarer will show her district's seasonal advisories inline on the map.
+Action item: send Dana the trail list export by May 15. This partnership could become the launch story.""",
+        "metadata": {"source": "conversation", "people": ["Dana Whitfield"], "date": "2026-05-08"},
     },
     {
-        "content": """Conversation with James (investor, Sequoia) — March 22, 2026.
-James: "What's the moat here? Big tech can build memory into their assistants."
-Me: "They will. But they'll do it generically. The moat is personal — the longer you use it, the better it knows you specifically. That graph of entities and relationships is yours."
-James: "Privacy concern?"
-Me: "Everything on-device or user-controlled cloud. Thine's whole brand is privacy-first."
-James: "What's the wedge? Why do I sign up?"
-Me: "Professionals who network heavily — founders, investors, executives. People who have 20 meaningful conversations a week and forget 80% of what was said."
-James: "Interesting. What's the revenue model?"
-Me: "Subscription. $200/mo for the full memory tier, lower tiers for lighter use."
-James seemed genuinely interested. He mentioned Rewind as a comp but agreed the mobile-first angle is differentiated.""",
-        "metadata": {"source": "conversation", "people": ["James", "Sequoia"], "date": "2026-03-22"},
+        "content": """Beta call with Elena Marsh — March 18, 2026.
+Elena has logged 41 hikes on the beta build — our most active tester.
+Her top complaints:
+1. Downloading a whole region for a single day-hike feels wasteful ("I don't need the whole mountain range. I need my route plus the escape routes.")
+2. The elevation profile hides when recording starts — she uses it to pace herself
+3. Battery anxiety: she carries a paper map because she doesn't trust the phone to last
+Every one of these turned into a roadmap item. The corridor download, the pinned profile, and the adaptive GPS work all trace back to this call.
+Need to follow up with Elena once the corridor build is in TestFlight — promised her first access.""",
+        "metadata": {"source": "conversation", "people": ["Elena Marsh"], "date": "2026-03-18"},
     },
     {
-        "content": """Conversation with Mom — April 2, 2026.
-Mom asked how the job application is going.
-I explained I'm applying to Thine — a startup building personal AI memory.
-She asked what I'd be doing there.
-Explained: building the memory and retrieval systems — the part that makes the AI actually remember things accurately rather than hallucinating.
-She said: "So like a really good filing system?"
-Me: "Kind of. But one that knows which files you need before you ask."
-She told me to make sure I show them what I've built. Said: "Don't just apply. Show them you already understand the problem."
-That conversation made me realise the demo needs to be live and impressive, not just a GitHub repo.""",
-        "metadata": {"source": "conversation", "people": ["Mom"], "date": "2026-04-02"},
+        "content": """Debate with Sam Okafor over lunch — May 19, 2026.
+Sam wants to add live location-sharing between hiking partners before launch. I pushed back.
+Sam's case: it's the most-requested feature after offline maps, and the safety angle is real.
+My case: it needs a realtime backend, presence handling, and privacy design — a month of work three weeks before the June 12 deadline, for a feature that fails exactly where our users are (no signal).
+Middle ground we landed on: post-hike track sharing ships at launch (pure upload, no realtime), live sharing goes to v2.1 with a mesh/satellite investigation.
+Wrote it down because we will absolutely relitigate this in July.""",
+        "metadata": {"source": "conversation", "people": ["Sam Okafor"], "date": "2026-05-19"},
     },
 
     # ── DECISIONS & PRIORITIES ───────────────────────────────────
     {
-        "content": """Key architectural decisions — ContextWeave v0.1 — March 14, 2026.
-After two weeks of prototyping, locked in the following:
-
-Storage:
-- ChromaDB for vectors (cosine similarity, persistent, zero-config)
-- SQLite for relational data + FTS5 full-text search
-- NetworkX + SQLite for the knowledge graph
-
-Processing:
-- fastembed BAAI/bge-small-en-v1.5 for embeddings (384-dim, fully local, zero API cost)
-- Groq llama-3.1-8b-instant for NER and reasoning (free tier: 14,400 req/day)
-- SemanticChunker with 512-token max, 2-sentence overlap
-
-Retrieval:
-- Hybrid fusion: 50% vector + 30% FTS + 20% graph
-- Temporal decay half-life: 30 days
-- Final top-K: 8 results
-
-These decisions optimise for: zero infrastructure cost, reasonable latency, and a complete demonstration of the memory pipeline.""",
-        "metadata": {"source": "note", "date": "2026-03-14"},
-    },
-    {
-        "content": """Priorities for the week of April 7, 2026.
-Critical:
-1. Get ContextWeave deployed and live on Render — need the URL for the application
-2. Seed with enough data to make the demo impressive (queries should return non-trivial answers)
-3. Fix the Python version issue on Render (pin to 3.11)
-
-High:
-4. Design the frontend to match Thine's editorial, light aesthetic
-5. Make sure the /query endpoint returns structured responses (query_type, confidence, patterns)
-
-Medium:
-6. Write a demo script showing the full ingest → query loop in < 2 minutes
-7. Add the live URL to the README
-
-Not this week:
-- Auth system
-- Multi-user support
-- Mobile app
-- Webhook integrations""",
-        "metadata": {"source": "note", "date": "2026-04-07"},
-    },
-    {
-        "content": """Reflection: what I've learned building ContextWeave — April 4, 2026.
-Technical learnings:
-- Hybrid retrieval is meaningfully better than pure vector search for personal context
-- Temporal decay is underused in production RAG systems — the literature supports it but few products implement it
-- SQLite FTS5 punches above its weight — it's fast, built-in, and handles proper nouns better than embeddings
-- Knowledge graphs for RAG are worth the complexity — 2-hop traversal catches connections pure vector search misses
-
-Product learnings:
-- The hardest part is the chunking strategy — wrong chunk boundaries destroy retrieval quality
-- Users need to feel the system working — the pipeline animation and live stats matter psychologically
-- "Memory" is more relatable than "RAG" or "vector search" — use the right vocabulary
-
-Personal learnings:
-- Building in public (GitHub) keeps you honest
-- A live demo is worth more than 10 architectural diagrams
-- The best way to understand a problem deeply is to build the solution yourself""",
-        "metadata": {"source": "journal", "date": "2026-04-04"},
-    },
-    {
-        "content": """Reading list and resources — ongoing, last updated April 2026.
-Papers read:
-- MemGPT: Towards LLMs as Operating Systems (Packer et al., 2023)
-- Generative Agents: Interactive Simulacra of Human Behavior (Park et al., 2023)
-- RAPTOR: Recursive Abstractive Processing for Tree-Organized Retrieval (2024)
-- Lost in the Middle: How LLMs Use Long Contexts (Liu et al., 2023)
-
-Books in progress:
-- The Pragmatic Programmer (Hunt & Thomas) — chapter on orthogonality
-- Designing Data-Intensive Applications (Kleppmann) — chapter on replication
-
-Resources bookmarked:
-- LangChain memory modules documentation
-- ChromaDB filtering and metadata guide
-- SQLite FTS5 official documentation
-- Gemini API rate limits and pricing page
-
-To read:
-- Ebbinghaus forgetting curve original paper
-- SM-2 spaced repetition algorithm specification
-- Anthropic's Constitutional AI paper""",
-        "metadata": {"source": "note", "date": "2026-04-06"},
+        "content": """Wayfarer v2 launch checklist — locked May 25, 2026.
+Scope for June 12 App Store submission:
+- Corridor offline downloads (zoom-capped, route + escape routes)
+- OSM + USGS hillshade map pipeline (Mapbox fully removed as of May 20)
+- Adaptive GPS sampling (11% battery per 4-hour hike, verified on Basecamp Ridge)
+- Offline FTS5 search across 40k features
+- Seasonal advisories from the Cascades ranger district (Dana Whitfield's team)
+- Post-hike track sharing (upload only)
+Explicitly cut: live location sharing (v2.1), Android tablet layout, watch app.
+Remaining before submission: Dana's trail review back by June 1, Lena's onboarding polish, App Store screenshots.
+I'll own the submission itself — reminder set for June 10 to freeze the build.""",
+        "metadata": {"source": "note", "date": "2026-05-25"},
     },
 ]
 
