@@ -49,7 +49,10 @@ def _send_via_resend(to: str, subject: str, text: str, html: str) -> None:
         headers={"Authorization": f"Bearer {settings.resend_api_key}"},
         timeout=30,
     )
-    response.raise_for_status()
+    if response.status_code >= 400:
+        # Resend's body says *why* (unverified domain, testing-mode
+        # recipient limits, bad key) — a bare status is undebuggable
+        raise RuntimeError(f"Resend API {response.status_code}: {response.text[:300]}")
 
 
 def _send_via_smtp(to: str, subject: str, text: str, html: str) -> None:
