@@ -32,6 +32,9 @@ class TestSecurityHeaders:
         assert "frame-ancestors 'self' https://huggingface.co" in csp
         assert r.headers["X-Content-Type-Options"] == "nosniff"
         assert "Referrer-Policy" in r.headers
+        # microphone=() would block our own 🎙 Listen button (Web Speech
+        # API needs same-origin mic access); camera/geolocation stay off
+        assert "microphone=(self)" in r.headers["Permissions-Policy"]
 
     def test_docs_exempt_from_csp_only(self, client):
         r = client.get("/docs")

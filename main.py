@@ -40,7 +40,9 @@ SECURITY_HEADERS = {
     ),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    # microphone=(self): the Listen button (Web Speech API) needs
+    # same-origin mic access — an empty allowlist blocks our own feature
+    "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
 }
 
 # Swagger/ReDoc load their bundles from a CDN with inline bootstrap scripts,
@@ -73,7 +75,9 @@ async def lifespan(app: FastAPI):
         digest_task = asyncio.create_task(scheduler_loop())
         logger.info("Pushed daily digest enabled — hourly delivery sweep scheduled")
     else:
-        logger.info("No email transport configured — pushed digests disabled (pull via /api/digest)")
+        logger.info(
+            "No email transport configured — pushed digests disabled (pull via /api/digest)"
+        )
 
     yield
 

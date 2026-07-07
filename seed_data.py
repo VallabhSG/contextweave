@@ -23,7 +23,11 @@ Decisions:
 - Ship Sierra and Cascades regions first, expand after launch
 Action items: Sam to prototype tile pre-fetch by March 20. Lena to sketch the download-region flow.
 I'll write the storage budget doc — how many GB is acceptable per region — by Friday.""",
-        "metadata": {"source": "meeting", "people": ["Sam Okafor", "Lena Fischer", "Ravi Menon"], "date": "2026-03-09"},
+        "metadata": {
+            "source": "meeting",
+            "people": ["Sam Okafor", "Lena Fischer", "Ravi Menon"],
+            "date": "2026-03-09",
+        },
     },
     {
         "content": """Weekly sync with Sam Okafor — March 23, 2026.
@@ -34,7 +38,11 @@ Options we discussed:
 3. Both — corridor fetch with a zoom cap
 Decision: option 3. The corridor idea came from Elena Marsh's beta feedback — she only ever hikes planned routes.
 Sam raised a concern about Mapbox's offline tile licensing. Follow up with their sales team before we commit.""",
-        "metadata": {"source": "meeting", "people": ["Sam Okafor", "Elena Marsh"], "date": "2026-03-23"},
+        "metadata": {
+            "source": "meeting",
+            "people": ["Sam Okafor", "Elena Marsh"],
+            "date": "2026-03-23",
+        },
     },
     {
         "content": """Design review with Lena Fischer — April 6, 2026.
@@ -45,7 +53,11 @@ C) Tap your planned route, and Wayfarer computes the corridor automatically
 We picked C — it matches how hikers actually think. Nobody plans "a rectangle".
 Lena's insight: "The download screen is the moment users decide whether to trust the app with their safety. It should feel calm."
 She'll have an interactive prototype by end of week. I promised to get her real corridor-size numbers from Sam's branch.""",
-        "metadata": {"source": "meeting", "people": ["Lena Fischer", "Sam Okafor"], "date": "2026-04-06"},
+        "metadata": {
+            "source": "meeting",
+            "people": ["Lena Fischer", "Sam Okafor"],
+            "date": "2026-04-06",
+        },
     },
     {
         "content": """1:1 with Ravi Menon — April 14, 2026.
@@ -56,7 +68,6 @@ We agreed to timebox a two-week OSM spike. If the terrain rendering looks accept
 Also discussed the App Store launch window: aim for the June hiking season, hard deadline June 12.""",
         "metadata": {"source": "meeting", "people": ["Ravi Menon"], "date": "2026-04-14"},
     },
-
     # ── JOURNAL ENTRIES ─────────────────────────────────────────
     {
         "content": """Journal — February 21, 2026.
@@ -91,7 +102,6 @@ The fork-detection heuristic Sam wrote (distance to nearest trail junction from 
 A hiker's phone dying at 2pm is a safety problem, not a UX problem. 11% feels shippable.""",
         "metadata": {"source": "journal", "date": "2026-05-11"},
     },
-
     # ── LEARNING NOTES ──────────────────────────────────────────
     {
         "content": """Learning notes: MBTiles and offline map storage — March 12, 2026.
@@ -135,7 +145,6 @@ Gotcha: FTS5 chokes on special characters in queries; sanitize before matching.
 Bonus discovery: bm25 ranking puts exact trail-name matches above partial peak-name matches with zero tuning. Shipping it as-is.""",
         "metadata": {"source": "note", "date": "2026-05-04"},
     },
-
     # ── CONVERSATIONS ────────────────────────────────────────────
     {
         "content": """Conversation with Dana Whitfield (Cascades district ranger) — May 8, 2026.
@@ -167,7 +176,6 @@ Middle ground we landed on: post-hike track sharing ships at launch (pure upload
 Wrote it down because we will absolutely relitigate this in July.""",
         "metadata": {"source": "conversation", "people": ["Sam Okafor"], "date": "2026-05-19"},
     },
-
     # ── DECISIONS & PRIORITIES ───────────────────────────────────
     {
         "content": """Wayfarer v2 launch checklist — locked May 25, 2026.
@@ -195,17 +203,19 @@ def ingest(entry: dict, idx: int) -> bool:
                 timeout=60,
             )
             if r.status_code == 429:  # per-IP ingest limit — wait out the window
-                print(f"  [{idx+1:02d}] rate limited, waiting 65s (attempt {attempt+1}/3)")
+                print(f"  [{idx + 1:02d}] rate limited, waiting 65s (attempt {attempt + 1}/3)")
                 time.sleep(65)
                 continue
             if r.status_code == 200:
                 data = r.json()
-                print(f"  [{idx+1:02d}] ok    {data['chunks_created']} chunks, {data['entities_extracted']} entities")
+                print(
+                    f"  [{idx + 1:02d}] ok    {data['chunks_created']} chunks, {data['entities_extracted']} entities"
+                )
                 return True
-            print(f"  [{idx+1:02d}] FAIL  HTTP {r.status_code}: {r.text[:80]}")
+            print(f"  [{idx + 1:02d}] FAIL  HTTP {r.status_code}: {r.text[:80]}")
             return False
         except Exception as e:
-            print(f"  [{idx+1:02d}] FAIL  {e}")
+            print(f"  [{idx + 1:02d}] FAIL  {e}")
             return False
     return False
 
@@ -216,7 +226,9 @@ def main():
     # Health check first
     try:
         h = httpx.get(f"{BASE}/api/health", timeout=15).json()
-        print(f"Current state: {h['events']} events, {h['memories']} memories, {h['entities']} entities\n")
+        print(
+            f"Current state: {h['events']} events, {h['memories']} memories, {h['entities']} entities\n"
+        )
     except Exception as e:
         print(f"Could not reach API: {e}\nMake sure the server is running.\n")
         return
@@ -232,7 +244,9 @@ def main():
 
     try:
         h = httpx.get(f"{BASE}/api/health", timeout=15).json()
-        print(f"New state: {h['events']} events, {h['memories']} memories, {h['entities']} entities, {h['vectors']} vectors")
+        print(
+            f"New state: {h['events']} events, {h['memories']} memories, {h['entities']} entities, {h['vectors']} vectors"
+        )
     except Exception:
         pass
 
