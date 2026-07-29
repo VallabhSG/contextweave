@@ -7,6 +7,7 @@ import logging
 import re
 
 from contextweave.config import settings
+from contextweave.reasoning.context_budget import AssembledContext, ContextBudgeter
 from contextweave.reasoning.prompts import QUERY_TYPE_PROMPTS, SYSTEM_PROMPT
 from contextweave.schemas import QueryResult, ReasoningResponse
 
@@ -35,6 +36,10 @@ class ReasoningEngine:
         self._api_key = api_key or settings.groq_api_key
         self._model_name = settings.reasoning_model
         self._client = None
+        self._budgeter = ContextBudgeter(
+            token_budget=settings.context_token_budget,
+            redundancy_threshold=settings.context_redundancy_threshold,
+        )
 
     def _get_client(self):
         if self._client is None:
@@ -112,10 +117,16 @@ class ReasoningEngine:
                 suggested = self.suggest_queries(results, knowledge_graph)
             except Exception as e:
                 logger.warning("Suggestion generation failed: %s", e)
+
+        # Select which memories actually enter the prompt: packed to a token
+        # budget with near-duplicates suppressed. Confidence is calibrated on
+        # what we packed, not on how many rows retrieval happened to return.
+        assembled = self._budgeter.assemble(results)
+
         if not self._api_key:
-            return self._fallback_response(query, results, detected_type, suggested)
+            return self._fallback_response(query, assembled, detected_type, suggested)
         prompt_template = QUERY_TYPE_PROMPTS.get(detected_type, QUERY_TYPE_PROMPTS["general"])
-        context_str = self._format_context(results)
+        context_str = self._format_context(assembled.results)
         prompt = prompt_template.format(context=context_str, query=query)
         try:
             client = self._get_client()
@@ -129,7 +140,6 @@ class ReasoningEngine:
                 max_tokens=2048,
             )
             answer = response.choices[0].message.content
-            confidence = min(1.0, len(results) / 8 * 0.8 + 0.2)
             patterns = []
             for line in answer.split("\n"):
                 line = line.strip()
@@ -137,17 +147,24 @@ class ReasoningEngine:
                     patterns.append(line.lstrip("- "))
             return ReasoningResponse(
                 answer=answer,
-                cited_memories=[r.chunk_id for r in results[:5]],
-                confidence=confidence,
+                cited_memories=[r.chunk_id for r in assembled.results[:5]],
+                confidence=assembled.confidence,
                 patterns=patterns[:10],
                 query_type=detected_type,
                 suggested_queries=suggested,
             )
         except Exception as e:
             logger.error("Reasoning failed: %s", e)
-            return self._fallback_response(query, results, detected_type, suggested)
+            return self._fallback_response(query, assembled, detected_type, suggested)
 
-    def _fallback_response(self, query, results, query_type, suggested=None):
+    def _fallback_response(
+        self,
+        query: str,
+        assembled: AssembledContext,
+        query_type: str,
+        suggested: list[str] | None = None,
+    ) -> ReasoningResponse:
+        results = assembled.results
         lines = [f"Found {len(results)} relevant memories for: **{query}**\n"]
         for i, r in enumerate(results[:5], 1):
             ts = r.timestamp.strftime("%Y-%m-%d")
@@ -155,7 +172,7 @@ class ReasoningEngine:
         return ReasoningResponse(
             answer="\n".join(lines),
             cited_memories=[r.chunk_id for r in results[:5]],
-            confidence=min(1.0, len(results) / 8 * 0.6),
+            confidence=assembled.confidence,
             patterns=[],
             query_type=query_type,
             suggested_queries=suggested or [],

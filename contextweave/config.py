@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     retrieval_final_k: int = 8
     graph_hop_depth: int = 2
 
+    # Context assembly: how much retrieved memory (estimated tokens) may enter
+    # the LLM prompt, and the lexical-overlap threshold above which a memory is
+    # treated as a near-duplicate and skipped to keep the context diverse.
+    context_token_budget: int = 3000
+    context_redundancy_threshold: float = 0.82
+
     decay_half_life_days: float = 30.0
     access_boost_factor: float = 1.2
     connection_density_weight: float = 0.3
