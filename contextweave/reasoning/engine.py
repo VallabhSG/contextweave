@@ -9,17 +9,10 @@ import re
 from contextweave.config import settings
 from contextweave.reasoning.context_budget import AssembledContext, ContextBudgeter
 from contextweave.reasoning.prompts import QUERY_TYPE_PROMPTS, SYSTEM_PROMPT
+from contextweave.reasoning.query_intent import detect_query_type
 from contextweave.schemas import QueryResult, ReasoningResponse
 
 logger = logging.getLogger(__name__)
-
-QUERY_TYPE_HINTS = {
-    "patterns": ["pattern", "trend", "recurring", "often", "usually", "tend to"],
-    "gaps": ["avoiding", "missing", "overlooking", "neglecting", "forgot"],
-    "temporal": ["evolved", "changed", "over time", "progression", "shift"],
-    "cross_reference": ["think about", "opinion on", "what does", "relationship between"],
-    "priorities": ["focus", "prioritize", "this week", "next", "should I", "what's important"],
-}
 
 SOURCE_CREDIBILITY = {
     "calendar": "factual",
@@ -110,7 +103,7 @@ class ReasoningEngine:
                 confidence=0.0,
                 query_type=query_type or "general",
             )
-        detected_type = query_type or self._detect_query_type(query)
+        detected_type = query_type or detect_query_type(query)
         suggested = []
         if knowledge_graph:
             try:
@@ -177,17 +170,6 @@ class ReasoningEngine:
             query_type=query_type,
             suggested_queries=suggested or [],
         )
-
-    def _detect_query_type(self, query: str) -> str:
-        query_lower = query.lower()
-        scores = {}
-        for qtype, keywords in QUERY_TYPE_HINTS.items():
-            score = sum(1 for kw in keywords if kw in query_lower)
-            if score > 0:
-                scores[qtype] = score
-        if scores:
-            return max(scores, key=scores.get)
-        return "general"
 
     @staticmethod
     def _format_context(results: list[QueryResult]) -> str:

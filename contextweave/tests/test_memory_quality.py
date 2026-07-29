@@ -102,6 +102,32 @@ class TestTemporalDecay:
         assert quarter == pytest.approx(0.075, abs=0.02)
 
 
+class TestIntentAwareDecay:
+    def test_temporal_intent_relaxes_decay_for_old_memory(self, ws):
+        # A 200-day-old reflection is heavily decayed under the default 30-day
+        # half-life — but a temporal query ("how has this evolved?") wants exactly
+        # this history surfaced, so intent-aware retrieval relaxes the decay.
+        ingest(
+            ws,
+            "Recurring reflection: I want to build a personal knowledge garden.",
+            days_ago=200,
+        )
+
+        q = "personal knowledge garden reflection"
+        default = ws.retriever.retrieve(q)
+        temporal = ws.retriever.retrieve(q, query_type="temporal")
+
+        def score_of(results):
+            return next((r.score for r in results if "knowledge garden" in r.content), 0.0)
+
+        default_score = score_of(default)
+        temporal_score = score_of(temporal)
+        assert default_score > 0.0 and temporal_score > 0.0, "memory retrieved under both intents"
+        assert temporal_score > default_score * 2, (
+            "relaxing decay for a temporal query should substantially raise an old memory's score"
+        )
+
+
 class TestAccessBoost:
     def test_recalled_memories_rank_higher(self, ws):
         ingest(ws, "Sketch for the reading tracker app, option Alpha: minimal list.", days_ago=30)

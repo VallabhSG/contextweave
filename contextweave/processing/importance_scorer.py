@@ -36,20 +36,29 @@ class ImportanceScorer:
         access_count: int = 0,
         connection_count: int = 0,
         now: datetime | None = None,
+        half_life_days: float | None = None,
     ) -> float:
-        """Calculate the current importance score for a memory."""
+        """Calculate the current importance score for a memory.
+
+        ``half_life_days`` overrides the instance default for this call only —
+        used by intent-aware retrieval to relax decay for temporal queries, where
+        old memories are the point rather than noise to bury.
+        """
         now = now or utcnow()
 
-        recency = self._recency_decay(timestamp, now)
+        recency = self._recency_decay(timestamp, now, half_life_days)
         access = self._access_boost(access_count)
         connections = self._connection_boost(connection_count)
 
         return min(1.0, base_importance * recency * access * connections)
 
-    def _recency_decay(self, timestamp: datetime, now: datetime) -> float:
+    def _recency_decay(
+        self, timestamp: datetime, now: datetime, half_life_days: float | None = None
+    ) -> float:
         """Exponential decay based on age."""
+        half_life = half_life_days or self.half_life_days
         days_elapsed = max(0, (now - timestamp).total_seconds() / 86400)
-        return math.exp(-math.log(2) * days_elapsed / self.half_life_days)
+        return math.exp(-math.log(2) * days_elapsed / half_life)
 
     def _access_boost(self, access_count: int) -> float:
         """Logarithmic boost from access frequency."""

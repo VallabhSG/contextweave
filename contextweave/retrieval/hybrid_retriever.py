@@ -8,6 +8,7 @@ from datetime import datetime
 from contextweave.config import settings
 from contextweave.processing.embedder import LocalEmbedder
 from contextweave.processing.importance_scorer import ImportanceScorer
+from contextweave.reasoning.query_intent import detect_query_type
 from contextweave.schemas import QueryResult, SourceType
 from contextweave.storage.knowledge_graph import KnowledgeGraph
 from contextweave.storage.memory_store import MemoryStore
@@ -42,9 +43,15 @@ class HybridRetriever:
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         extra_terms: list[str] | None = None,
+        query_type: str | None = None,
     ) -> list[QueryResult]:
         """Execute hybrid retrieval and return ranked results."""
         final_k = top_k or settings.retrieval_final_k
+
+        # Intent-aware decay: a temporal query wants the history preserved, so
+        # relax the recency half-life instead of burying old memories.
+        intent = query_type or detect_query_type(query)
+        half_life = settings.temporal_query_half_life_days if intent == "temporal" else None
 
         # 1. Vector similarity search (degrade gracefully if embedding fails or store empty)
         vector_results = []
@@ -168,6 +175,7 @@ class HybridRetriever:
                 timestamp=ts,
                 access_count=access_counts.get(item["chunk_id"], 0),
                 connection_count=conn_count,
+                half_life_days=half_life,
             )
 
             source_str = item["metadata"].get("source", "unknown")

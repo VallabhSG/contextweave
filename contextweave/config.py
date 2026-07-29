@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     access_boost_factor: float = 1.2
     connection_density_weight: float = 0.3
 
+    # Intent-aware retrieval: for temporal queries ("how has X evolved over
+    # time?") the history is the answer, so decay is relaxed to this much longer
+    # half-life instead of burying old memories under the default 30-day decay.
+    temporal_query_half_life_days: float = 365.0
+
     host: str = "0.0.0.0"
     port: int = 8000
 

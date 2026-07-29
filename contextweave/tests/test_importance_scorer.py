@@ -39,6 +39,15 @@ class TestImportanceScorer:
         # At half-life, decay should be ~0.5 (before any boosts)
         assert 0.4 <= score <= 0.6
 
+    def test_half_life_override_relaxes_decay(self, scorer):
+        # A per-call half-life override (used by intent-aware retrieval for
+        # temporal queries) should decay an old memory far less than the default.
+        now = utcnow()
+        old = now - timedelta(days=90)
+        default = scorer.score(base_importance=0.6, timestamp=old, now=now)
+        relaxed = scorer.score(base_importance=0.6, timestamp=old, now=now, half_life_days=365.0)
+        assert relaxed > default * 3
+
     def test_access_boost_increases_score(self, scorer):
         now = utcnow()
         base = scorer.score(base_importance=0.5, timestamp=now, access_count=0)

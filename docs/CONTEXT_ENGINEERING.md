@@ -48,14 +48,18 @@ test), so de-duplication must live in the assembly layer, never in the retriever
       near-identical to something already packed. Diversity beats repetition.
 - [x] **Relevance-calibrated confidence** — derive confidence from packed
       relevance scores and breadth, not from raw result count.
+- [x] **Intent-aware temporal decay** — a `temporal` query ("how has X evolved
+      over time?") now relaxes the recency half-life so old memories, which *are*
+      the answer, are not decayed into oblivion. Query-intent detection is shared
+      (`reasoning/query_intent.py`) so retriever and reasoning agree.
 - [ ] **Graph expansion from FTS matches too** — `HybridRetriever` seeds graph
       traversal only from vector hits; keyword-only matches never expand their
       entities. Connect more dots.
 - [ ] **BM25 score normalization** — `abs(fts_rank)/10` is an arbitrary clip.
       Normalize FTS relevance against the candidate set instead.
-- [ ] **Query-adaptive fusion weights** — a `temporal` query should weight
-      recency; a `cross_reference` query should weight graph. Today weights are
-      fixed 0.5/0.3/0.2 for every query type.
+- [ ] **Query-adaptive fusion weights** — decay is now intent-aware (above), but
+      the vector/FTS/graph *fusion* weights are still fixed 0.5/0.3/0.2 for every
+      query type; a `cross_reference` query should lean harder on the graph.
 - [ ] **Pre-decay relevance channel** — expose the un-decayed relevance on
       `QueryResult` so confidence can separate "old" from "irrelevant".
 - [ ] **Real tokenizer (optional)** — the budgeter uses a chars/4 heuristic;
@@ -77,6 +81,17 @@ test), so de-duplication must live in the assembly layer, never in the retriever
    the property, not the plumbing.
 
 ## Changelog
+
+### 2026-07-30 — Intent-aware retrieval decay
+- Extracted query-intent detection into `reasoning/query_intent.py`
+  (`detect_query_type`), shared by the reasoning engine and the retriever.
+- `ImportanceScorer.score` accepts a per-call `half_life_days` override.
+- `HybridRetriever.retrieve` accepts `query_type` and, for temporal queries,
+  relaxes decay via `context`-configurable `temporal_query_half_life_days`
+  (default 365d) so history is preserved rather than buried.
+- Threaded the API's explicit `query_type` through to retrieval.
+- Tests: `tests/test_query_intent.py`, a scorer-override case, and a real-embedding
+  decay case in `tests/test_memory_quality.py`. Full suite 135 passed.
 
 ### 2026-07-30 — Context assembly layer
 - Added `reasoning/context_budget.py`: `ContextBudgeter` with token-budgeted

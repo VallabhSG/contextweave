@@ -201,6 +201,7 @@ def _run_query(ws: Workspace, req: QueryRequest) -> QueryResponse:
         date_from=date_from,
         date_to=date_to,
         extra_terms=expanded_terms,
+        query_type=req.query_type,
     )
 
     response = reasoning.reason(
