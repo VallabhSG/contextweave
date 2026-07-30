@@ -17,6 +17,18 @@ from contextweave.timeutils import utcnow
 
 logger = logging.getLogger(__name__)
 
+# SQLite FTS5 bm25() returns negative scores (more negative = stronger match).
+# Normalize to [0, 1) with a smooth saturating curve rather than an arbitrary
+# hard clip, so FTS relevance composes predictably with the [0, 1] vector score.
+# _FTS_SATURATION_K is the match strength that maps to a relevance of 0.5.
+_FTS_SATURATION_K = 5.0
+
+
+def _normalize_fts_rank(rank: float) -> float:
+    """Map an FTS5 bm25 rank (negative = better) to a [0, 1) relevance score."""
+    strength = max(0.0, -rank)
+    return strength / (strength + _FTS_SATURATION_K)
+
 
 class HybridRetriever:
     """Multi-signal retrieval: vector + FTS + graph, fused and reranked."""
@@ -83,6 +95,13 @@ class HybridRetriever:
             entities = vr["metadata"].get("entities", "").split(",")
             entity_names.update(e.strip() for e in entities if e.strip())
 
+        # Also seed graph expansion from keyword (FTS) matches. This connects the
+        # dots even when a memory surfaces by keyword rather than vector, and
+        # keeps the graph working when vector search is unavailable (embedding
+        # outage) and returns nothing at all.
+        for fr in fts_results:
+            entity_names.update(e.strip() for e in fr.get("entities", []) if e and e.strip())
+
         for entity in entity_names:
             connected = self.knowledge_graph.get_connected_chunks(
                 entity, hops=settings.graph_hop_depth
@@ -107,7 +126,7 @@ class HybridRetriever:
         # FTS results
         for fr in fts_results:
             chunk_id = fr["chunk_id"]
-            fts_normalized = min(1.0, abs(fr["fts_rank"]) / 10.0)
+            fts_normalized = _normalize_fts_rank(fr["fts_rank"])
             if chunk_id in scored:
                 scored[chunk_id]["fts_score"] = fts_normalized
             else:

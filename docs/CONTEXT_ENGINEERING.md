@@ -52,11 +52,14 @@ test), so de-duplication must live in the assembly layer, never in the retriever
       over time?") now relaxes the recency half-life so old memories, which *are*
       the answer, are not decayed into oblivion. Query-intent detection is shared
       (`reasoning/query_intent.py`) so retriever and reasoning agree.
-- [ ] **Graph expansion from FTS matches too** — `HybridRetriever` seeds graph
-      traversal only from vector hits; keyword-only matches never expand their
-      entities. Connect more dots.
-- [ ] **BM25 score normalization** — `abs(fts_rank)/10` is an arbitrary clip.
-      Normalize FTS relevance against the candidate set instead.
+- [x] **Graph expansion from FTS matches too** — graph traversal now seeds from
+      keyword (FTS) hits as well as vector hits, so connections surface even when
+      a memory matches by keyword and, crucially, when vector search is
+      unavailable (embedding outage) and returns nothing.
+- [x] **BM25 score normalization** — replaced the arbitrary `abs(rank)/10` clip
+      with a smooth saturating curve (`strength / (strength + k)`), so FTS
+      relevance composes predictably with the vector score and strong matches no
+      longer collapse to an identical clipped 1.0.
 - [ ] **Query-adaptive fusion weights** — decay is now intent-aware (above), but
       the vector/FTS/graph *fusion* weights are still fixed 0.5/0.3/0.2 for every
       query type; a `cross_reference` query should lean harder on the graph.
@@ -81,6 +84,14 @@ test), so de-duplication must live in the assembly layer, never in the retriever
    the property, not the plumbing.
 
 ## Changelog
+
+### 2026-07-30 — Retrieval fusion quality (graph seeding + BM25 normalization)
+- `HybridRetriever` now seeds graph expansion from FTS matches too, not only
+  vector hits — connections survive an embedding outage.
+- Replaced the arbitrary FTS `abs(rank)/10` clip with a smooth saturating
+  normalization (`_normalize_fts_rank`, k=5).
+- Tests: `tests/test_hybrid_retriever.py` (normalization) and a vector-outage
+  graph-expansion case in `tests/test_memory_quality.py`. Full suite 140 passed.
 
 ### 2026-07-30 — Intent-aware retrieval decay
 - Extracted query-intent detection into `reasoning/query_intent.py`

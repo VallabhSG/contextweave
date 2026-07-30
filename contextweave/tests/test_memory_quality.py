@@ -190,6 +190,25 @@ class TestGraphExpansion:
             "the graph-connected chunk should outrank the unrelated one"
         )
 
+    def test_graph_expansion_survives_vector_outage(self, ws, monkeypatch):
+        # Graph seeds must not come from vector hits alone: when embedding is
+        # down, keyword (FTS) matches still drive graph expansion.
+        ingest(ws, "Spoke with Dana Whitfield about the funding options for Project Falcon.")
+        ingest(ws, "The prototype for Project Falcon needs a dedicated hardware fund.")
+
+        def boom(*_args, **_kwargs):
+            raise RuntimeError("embedding backend down")
+
+        monkeypatch.setattr(ws.retriever.embedder, "embed_query", boom)
+
+        results = ws.retriever.retrieve("Dana Whitfield funding")
+        contents = [r.content for r in results]
+
+        assert any("Dana Whitfield" in c for c in contents), "keyword match still retrieved"
+        assert any("prototype" in c for c in contents), (
+            "FTS-seeded graph expansion should still reach the connected Falcon chunk"
+        )
+
 
 class TestFilters:
     def test_date_and_source_filters(self, ws):
