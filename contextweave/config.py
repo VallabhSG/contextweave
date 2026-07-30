@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     # treated as a near-duplicate and skipped to keep the context diverse.
     context_token_budget: int = 3000
     context_redundancy_threshold: float = 0.82
+    # A memory longer than this is compressed to its most query-relevant
+    # sentences before packing, so the budget holds more on-point context.
+    context_max_tokens_per_memory: int = 200
 
     decay_half_life_days: float = 30.0
     access_boost_factor: float = 1.2

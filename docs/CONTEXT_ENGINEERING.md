@@ -83,8 +83,10 @@ test), so de-duplication must live in the assembly layer, never in the retriever
 - [ ] **Real tokenizer (optional)** — the budgeter uses a chars/4 heuristic;
       allow injecting a true tokenizer for exact accounting without adding a
       hard dependency.
-- [ ] **Sentence-level context compression** — when a memory is long but only
-      one passage is on-topic, pack the passage, not the whole memory.
+- [x] **Sentence-level context compression** — when the query is known, a memory
+      longer than `context_max_tokens_per_memory` is compressed to its most
+      query-relevant sentences (first/framing sentence always kept), so the
+      budget holds more distinct, on-point context instead of one memory's filler.
 
 ## Design principles
 
@@ -99,6 +101,18 @@ test), so de-duplication must live in the assembly layer, never in the retriever
    the property, not the plumbing.
 
 ## Changelog
+
+### 2026-07-30 — Query-aware extractive compression
+- `ContextBudgeter.assemble` now takes the `query`; a memory longer than
+  `context_max_tokens_per_memory` (default 200) is compressed to its most
+  query-relevant sentences before packing (first sentence always kept), so the
+  budget holds more on-point context and less filler.
+- Truncation is now query-aware too: the budget-boundary memory keeps its
+  relevant sentences rather than just its opening.
+- Behaviour is gated on a query — `assemble(results)` with no query is byte-for-
+  byte unchanged, so all prior tests hold.
+- Tests: `TestQueryAwareCompression` in `tests/test_context_budget.py`. Full
+  suite 147 passed.
 
 ### 2026-07-30 — Confidence coherence (pre-decay relevance channel)
 - Added `QueryResult.relevance` (pre-decay fused relevance, clamped to [0,1]).

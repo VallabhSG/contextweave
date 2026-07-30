@@ -10,6 +10,7 @@ from __future__ import annotations
 from contextweave.reasoning.context_budget import (
     ContextBudgeter,
     _jaccard,
+    _split_sentences,
     _tokenize_words,
     estimate_tokens,
 )
@@ -98,6 +99,67 @@ class TestRedundancy:
         assembled = ContextBudgeter(token_budget=5000).assemble(results)
         assert len(assembled.results) == 5
         assert assembled.dropped_for_redundancy == 0
+
+
+class TestQueryAwareCompression:
+    def test_split_sentences(self):
+        assert _split_sentences("One. Two! Three?") == ["One.", "Two!", "Three?"]
+        assert _split_sentences("No terminator here") == ["No terminator here"]
+
+    def test_compress_keeps_relevant_sentence_regardless_of_position(self):
+        # Relevant sentence is LAST — front-truncation would miss it entirely.
+        first = "Weekly planning notes for the team."
+        filler = " ".join(["The office plants needed watering again today."] * 30)
+        relevant = "The cloud budget was cut by twenty percent."
+        content = f"{first} {filler} {relevant}"
+
+        out = ContextBudgeter()._compress(
+            content, _tokenize_words("cloud budget cut percent"), max_tokens=60
+        )
+
+        assert "cloud budget was cut" in out, "the relevant tail sentence must survive"
+        assert "Weekly planning notes" in out, "the framing (first) sentence is always kept"
+        assert "watering" not in out, "irrelevant filler should be dropped"
+        assert "…[trimmed]" in out
+
+    def test_compress_leaves_short_content_untouched(self):
+        content = "A short single note about the budget review."
+        assert ContextBudgeter()._compress(content, _tokenize_words("budget"), 200) == content
+
+    def test_no_query_does_not_compress(self):
+        long_mem = make_result("m", distinct("topic", 100), score=0.8)
+        out = ContextBudgeter(token_budget=5000, max_tokens_per_memory=50).assemble([long_mem])
+        assert out.results[0].content == long_mem.content, "no query => memory packed whole"
+        assert out.truncated_ids == []
+
+    def test_query_compresses_long_memory(self):
+        content = "Budget summary note. " + " ".join(
+            f"irrelevant{j} filler text here." for j in range(50)
+        )
+        mem = make_result("m", content, score=0.8)
+
+        out = ContextBudgeter(token_budget=5000, max_tokens_per_memory=40).assemble(
+            [mem], query="budget summary"
+        )
+
+        assert out.results[0].content != content, "long memory should be compressed"
+        assert "m" in out.truncated_ids
+        assert out.results[0].content.count("filler") < content.count("filler")
+
+    def test_compression_fits_more_on_point_memories(self):
+        def mem(i):
+            relevant = f"Decision about project{i}: we picked the budget plan for team{i}."
+            filler = " ".join(f"aside{i}x{j} background detail sentence here." for j in range(40))
+            return make_result(f"c{i}", f"{relevant} {filler}", score=0.8)
+
+        results = [mem(i) for i in range(5)]
+        budgeter = ContextBudgeter(token_budget=700, max_tokens_per_memory=120)
+
+        without = budgeter.assemble(results)
+        with_query = budgeter.assemble(results, query="budget plan project decision")
+
+        assert len(with_query.results) > len(without.results), "compression frees budget for more"
+        assert with_query.token_estimate <= 700 + 8
 
 
 class TestConfidenceCalibration:

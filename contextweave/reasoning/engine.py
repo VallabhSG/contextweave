@@ -32,6 +32,7 @@ class ReasoningEngine:
         self._budgeter = ContextBudgeter(
             token_budget=settings.context_token_budget,
             redundancy_threshold=settings.context_redundancy_threshold,
+            max_tokens_per_memory=settings.context_max_tokens_per_memory,
         )
 
     def _get_client(self):
@@ -114,7 +115,7 @@ class ReasoningEngine:
         # Select which memories actually enter the prompt: packed to a token
         # budget with near-duplicates suppressed. Confidence is calibrated on
         # what we packed, not on how many rows retrieval happened to return.
-        assembled = self._budgeter.assemble(results)
+        assembled = self._budgeter.assemble(results, query=query)
 
         if not self._api_key:
             return self._fallback_response(query, assembled, detected_type, suggested)
