@@ -84,10 +84,12 @@ test), so de-duplication must live in the assembly layer, never in the retriever
 - [ ] **Real tokenizer (optional)** — the budgeter uses a chars/4 heuristic;
       allow injecting a true tokenizer for exact accounting without adding a
       hard dependency.
-- [ ] **Harden FTS query escaping** — `MemoryStore.search_fts` strips `["()*:]`
-      but not `?`, so a question-mark query (`"...Dana Whitfield?"`) fails the
-      FTS5 MATCH and keyword search silently degrades (vector/graph still carry
-      it). Surfaced by the eval harness. Escape/strip trailing punctuation.
+- [x] **FTS query robustness + OR semantics** — `search_fts` stripped only
+      `["()*:]`, so a `?` broke FTS5 MATCH and keyword search silently died; worse,
+      FTS5's implicit AND meant a natural-language question matched only when
+      *every* word was present, leaving the 30%-weighted FTS channel dormant. Now
+      strips all punctuation and ORs the terms so bm25 ranks by how strongly they
+      hit. Measured: MRR 0.69 → 0.78. Surfaced and validated by the eval harness.
 - [x] **Sentence-level context compression** — when the query is known, a memory
       longer than `context_max_tokens_per_memory` is compressed to its most
       query-relevant sentences (first/framing sentence always kept), so the
@@ -106,6 +108,15 @@ test), so de-duplication must live in the assembly layer, never in the retriever
    the property, not the plumbing.
 
 ## Changelog
+
+### 2026-07-30 — FTS robustness + OR semantics (eval-driven)
+- `search_fts` now strips all punctuation (a `?` previously broke FTS5 MATCH)
+  and ORs the query terms instead of relying on FTS5's implicit AND — which had
+  left keyword search dormant for natural-language questions (every word had to
+  be present). bm25 now ranks by match strength.
+- **Measured via the eval harness: MRR 0.69 → 0.78** (hit@5 stays 1.0); eval MRR
+  baseline raised 0.6 → 0.7 to lock in the gain.
+- Tests: `test_fts_search_tolerates_punctuation`. Full suite 165 passed.
 
 ### 2026-07-30 — Retrieval evaluation harness
 - Added `tests/test_retrieval_eval.py`: a labelled query set scored with hit@k

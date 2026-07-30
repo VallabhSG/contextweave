@@ -129,6 +129,14 @@ class TestMemoryStore:
         results = store.search_fts("planning deadlines")
         assert len(results) >= 1
 
+    def test_fts_search_tolerates_punctuation(self, store, sample_event, sample_chunk):
+        # A question-mark query must not break FTS5 MATCH and silently return
+        # nothing — punctuation is stripped before the search.
+        store.save_event(sample_event)
+        store.save_chunk(sample_chunk)
+        results = store.search_fts("what about planning deadlines?")
+        assert len(results) >= 1
+
     def test_record_access_increments_count(self, store, sample_memory):
         store.save_memory(sample_memory)
         store.record_access(sample_memory.id)

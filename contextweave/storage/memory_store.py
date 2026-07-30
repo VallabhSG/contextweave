@@ -153,9 +153,15 @@ class MemoryStore:
     def search_fts(self, query: str, limit: int = 20) -> list[dict]:
         """Full-text search over chunks."""
         # Escape FTS5 special characters to prevent OperationalError
-        safe_query = re.sub(r'["()*:]', " ", query).strip()
-        if not safe_query:
+        # Strip everything but word chars and whitespace so user punctuation
+        # (?, !, quotes, parens, FTS5 operators) can't break the MATCH syntax,
+        # then OR the terms. FTS5 defaults to implicit AND, which requires every
+        # word present — useless for a natural-language question. OR matches any
+        # term and lets bm25 rank by how many/how strongly they hit.
+        terms = re.sub(r"[^\w\s]", " ", query, flags=re.UNICODE).split()
+        if not terms:
             return []
+        safe_query = " OR ".join(terms)
 
         with self._conn() as conn:
             try:
