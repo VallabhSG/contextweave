@@ -195,9 +195,12 @@ class ReasoningEngine:
             entities = ", ".join(r.entities) if r.entities else "none"
             credibility = SOURCE_CREDIBILITY.get(r.source.value, "general")
             lines.append(
+                # Show match quality (relevance), not the decay-tuned ranking
+                # score — otherwise an older-but-on-topic memory reads as
+                # irrelevant to the model and gets wrongly distrusted.
                 f"### Memory {i} [{r.source.value}: {timestamp}] [credibility: {credibility}]\n"
                 f"Entities: {entities}\n"
-                f"Relevance: {r.score:.2f}\n\n"
+                f"Relevance: {r.relevance:.2f}\n\n"
                 f"{r.content}\n"
             )
         return "\n---\n".join(lines)

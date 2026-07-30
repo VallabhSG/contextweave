@@ -38,6 +38,24 @@ class TestPromptGuidance:
         assert LOW_CONFIDENCE_GUIDANCE.strip() not in prompt
 
 
+class TestContextFormatting:
+    def test_shows_match_relevance_not_decayed_score(self):
+        # An older-but-on-topic memory: low decayed score, high match relevance.
+        # The model must see the relevance, or it wrongly distrusts good context.
+        r = QueryResult(
+            chunk_id="a",
+            content="The cloud budget was cut by twenty percent.",
+            score=0.05,
+            relevance=0.9,
+            source=SourceType.NOTE,
+            timestamp=utcnow(),
+            entities=["Budget"],
+        )
+        out = ReasoningEngine._format_context([r])
+        assert "Relevance: 0.90" in out
+        assert "Relevance: 0.05" not in out
+
+
 class TestFallbackGuidance:
     def test_fallback_flags_weak_context(self):
         # No API key => fallback path; weak relevance => low confidence => caution.

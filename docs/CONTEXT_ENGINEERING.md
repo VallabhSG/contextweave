@@ -103,6 +103,13 @@ test), so de-duplication must live in the assembly layer, never in the retriever
 
 ## Changelog
 
+### 2026-07-30 — Coherent relevance label in the prompt
+- `_format_context` labelled each memory to the LLM with `Relevance: {score}`,
+  but post-iteration-4 `score` is the decay-tuned ranking score — so an
+  older-but-on-topic memory read as "Relevance: 0.05" and the model was told to
+  distrust good context. Now shows `relevance` (pre-decay match quality); recency
+  is already conveyed by the timestamp. Test in `tests/test_reasoning_engine.py`.
+
 ### 2026-07-30 — Confidence-aware answer guidance
 - Confidence (built in iteration 4) now *shapes the answer*, not just the
   response metadata. Below `context_low_confidence_threshold` (0.35) the reasoning
