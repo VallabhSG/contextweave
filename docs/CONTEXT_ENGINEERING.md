@@ -84,6 +84,10 @@ test), so de-duplication must live in the assembly layer, never in the retriever
 - [ ] **Real tokenizer (optional)** — the budgeter uses a chars/4 heuristic;
       allow injecting a true tokenizer for exact accounting without adding a
       hard dependency.
+- [ ] **Harden FTS query escaping** — `MemoryStore.search_fts` strips `["()*:]`
+      but not `?`, so a question-mark query (`"...Dana Whitfield?"`) fails the
+      FTS5 MATCH and keyword search silently degrades (vector/graph still carry
+      it). Surfaced by the eval harness. Escape/strip trailing punctuation.
 - [x] **Sentence-level context compression** — when the query is known, a memory
       longer than `context_max_tokens_per_memory` is compressed to its most
       query-relevant sentences (first/framing sentence always kept), so the
@@ -102,6 +106,14 @@ test), so de-duplication must live in the assembly layer, never in the retriever
    the property, not the plumbing.
 
 ## Changelog
+
+### 2026-07-30 — Retrieval evaluation harness
+- Added `tests/test_retrieval_eval.py`: a labelled query set scored with hit@k
+  and MRR over a shared corpus (real embeddings), asserting a quality baseline
+  (hit@5 ≥ 0.8, MRR ≥ 0.6). Current: **hit@5 = 1.00, MRR = 0.69** — so tuning is
+  now measurable and a future retrieval regression fails here, not in production.
+- The harness surfaced a latent bug: `search_fts` doesn't escape `?`, so
+  question-mark queries silently skip keyword search (logged to backlog).
 
 ### 2026-07-30 — Coherent relevance label in the prompt
 - `_format_context` labelled each memory to the LLM with `Relevance: {score}`,
