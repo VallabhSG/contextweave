@@ -103,6 +103,16 @@ test), so de-duplication must live in the assembly layer, never in the retriever
 
 ## Changelog
 
+### 2026-07-30 — Confidence-aware answer guidance
+- Confidence (built in iteration 4) now *shapes the answer*, not just the
+  response metadata. Below `context_low_confidence_threshold` (0.35) the reasoning
+  prompt gains an explicit hedge instruction ("answer only what the context
+  supports; flag what's missing; don't speculate"), and the no-LLM fallback
+  appends a caution note. Serves the product's "be honest when context is
+  insufficient" pillar.
+- Extracted `ReasoningEngine._build_prompt` for testability.
+- Tests: `tests/test_reasoning_engine.py` (LLM-free). Full suite 161 passed.
+
 ### 2026-07-30 — Query-adaptive fusion weights
 - `fusion_weights(intent)` returns (vector, fts, graph) weights per query intent;
   `cross_reference` (0.4/0.2/0.4) and `patterns` (0.45/0.2/0.35) lean on the

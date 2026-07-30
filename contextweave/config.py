@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # A memory longer than this is compressed to its most query-relevant
     # sentences before packing, so the budget holds more on-point context.
     context_max_tokens_per_memory: int = 200
+    # Below this assembled confidence, the answer is told to hedge explicitly
+    # rather than confidently fill gaps from sparse/weak context.
+    context_low_confidence_threshold: float = 0.35
 
     decay_half_life_days: float = 30.0
     access_boost_factor: float = 1.2

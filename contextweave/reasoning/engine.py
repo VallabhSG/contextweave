@@ -8,7 +8,12 @@ import re
 
 from contextweave.config import settings
 from contextweave.reasoning.context_budget import AssembledContext, ContextBudgeter
-from contextweave.reasoning.prompts import QUERY_TYPE_PROMPTS, SYSTEM_PROMPT
+from contextweave.reasoning.prompts import (
+    LOW_CONFIDENCE_GUIDANCE,
+    LOW_CONFIDENCE_NOTE,
+    QUERY_TYPE_PROMPTS,
+    SYSTEM_PROMPT,
+)
 from contextweave.reasoning.query_intent import detect_query_type
 from contextweave.schemas import QueryResult, ReasoningResponse
 
@@ -119,9 +124,7 @@ class ReasoningEngine:
 
         if not self._api_key:
             return self._fallback_response(query, assembled, detected_type, suggested)
-        prompt_template = QUERY_TYPE_PROMPTS.get(detected_type, QUERY_TYPE_PROMPTS["general"])
-        context_str = self._format_context(assembled.results)
-        prompt = prompt_template.format(context=context_str, query=query)
+        prompt = self._build_prompt(query, assembled.results, detected_type, assembled.confidence)
         try:
             client = self._get_client()
             response = client.chat.completions.create(
@@ -151,6 +154,16 @@ class ReasoningEngine:
             logger.error("Reasoning failed: %s", e)
             return self._fallback_response(query, assembled, detected_type, suggested)
 
+    def _build_prompt(
+        self, query: str, results: list[QueryResult], query_type: str, confidence: float
+    ) -> str:
+        """Format the reasoning prompt, adding a hedge instruction on weak context."""
+        template = QUERY_TYPE_PROMPTS.get(query_type, QUERY_TYPE_PROMPTS["general"])
+        prompt = template.format(context=self._format_context(results), query=query)
+        if confidence < settings.context_low_confidence_threshold:
+            prompt += LOW_CONFIDENCE_GUIDANCE
+        return prompt
+
     def _fallback_response(
         self,
         query: str,
@@ -163,6 +176,8 @@ class ReasoningEngine:
         for i, r in enumerate(results[:5], 1):
             ts = r.timestamp.strftime("%Y-%m-%d")
             lines.append(f"{i}. [{r.source.value} · {ts}] {r.content[:200]}...")
+        if assembled.confidence < settings.context_low_confidence_threshold:
+            lines.append(LOW_CONFIDENCE_NOTE)
         return ReasoningResponse(
             answer="\n".join(lines),
             cited_memories=[r.chunk_id for r in results[:5]],
