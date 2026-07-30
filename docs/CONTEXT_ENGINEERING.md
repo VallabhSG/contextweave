@@ -74,9 +74,10 @@ test), so de-duplication must live in the assembly layer, never in the retriever
       (Note: the BM25 saturating normalization lowered FTS's *effective*
       contribution for strong keyword matches vs. the old hard clip — revisit `k`
       or move to set-relative FTS scaling when tuning fusion weights.)
-- [ ] **Graph expansion priority by hop distance** — `graph_chunk_ids` is now
-      iterated in sorted order for determinism, but the 50-chunk cap should
-      prefer nearer (1-hop) connections over farther ones.
+- [x] **Graph expansion priority by hop distance** — graph traversal now tracks
+      each chunk's minimum hop distance (`get_connected_chunks_ranked`), and the
+      retriever's 50-chunk cap keeps the *nearest* connections instead of
+      alphabetically-first chunk IDs. 1-hop co-occurrences beat distant 2-hop links.
 - [ ] **Backfill after truncation** — `ContextBudgeter.assemble` breaks after
       truncating the last-fitting memory; a shorter later candidate could still
       fill remaining budget. Packing efficiency, not correctness.
@@ -101,6 +102,14 @@ test), so de-duplication must live in the assembly layer, never in the retriever
    the property, not the plumbing.
 
 ## Changelog
+
+### 2026-07-30 — Hop-distance graph prioritization
+- `KnowledgeGraph.get_neighbors_with_distance` / `get_connected_chunks_ranked`
+  expose each connected chunk's minimum hop distance from the query entity.
+- `HybridRetriever` uses the distance so the 50-chunk graph cap keeps the
+  nearest connections (1-hop before 2-hop) rather than alphabetically-first IDs.
+  `get_connected_chunks` now also returns nearest-first.
+- Tests: `tests/test_knowledge_graph.py`. Full suite 153 passed.
 
 ### 2026-07-30 — Query-aware extractive compression
 - `ContextBudgeter.assemble` now takes the `query`; a memory longer than

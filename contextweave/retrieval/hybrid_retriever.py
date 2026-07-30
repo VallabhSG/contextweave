@@ -88,7 +88,7 @@ class HybridRetriever:
                         seen_ids.add(r["chunk_id"])
 
         # 3. Graph expansion — extract entity names from query results
-        graph_chunk_ids = set()
+        chunk_distance: dict[str, int] = {}
         entity_names = set()
 
         for vr in vector_results:
@@ -103,10 +103,12 @@ class HybridRetriever:
             entity_names.update(e.strip() for e in fr.get("entities", []) if e and e.strip())
 
         for entity in entity_names:
-            connected = self.knowledge_graph.get_connected_chunks(
+            ranked = self.knowledge_graph.get_connected_chunks_ranked(
                 entity, hops=settings.graph_hop_depth
             )
-            graph_chunk_ids.update(connected)
+            for chunk_id, dist in ranked.items():
+                if chunk_id not in chunk_distance or dist < chunk_distance[chunk_id]:
+                    chunk_distance[chunk_id] = dist
 
         # 4. Merge all results into a unified scoring map
         scored: dict[str, dict] = {}
@@ -151,10 +153,11 @@ class HybridRetriever:
         # connected chunks they missed (this is what "connects the dots":
         # a chunk with no lexical or semantic overlap still surfaces when
         # it shares entities with the ones that matched)
-        # sorted() keeps the added_from_graph cap deterministic — set iteration
-        # order over strings varies with PYTHONHASHSEED across processes.
+        # Prefer nearer (fewer-hop) connections when the additive cap bites: a
+        # 1-hop co-occurrence is more relevant than a distant 2-hop link. Sorting
+        # by (distance, id) also keeps the cap deterministic across PYTHONHASHSEED.
         added_from_graph = 0
-        for chunk_id in sorted(graph_chunk_ids):
+        for chunk_id in sorted(chunk_distance, key=lambda cid: (chunk_distance[cid], cid)):
             if chunk_id in scored:
                 scored[chunk_id]["graph_score"] = 0.3
                 continue

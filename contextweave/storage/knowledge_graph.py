@@ -180,21 +180,50 @@ class KnowledgeGraph:
 
         return sorted(visited)
 
-    def get_connected_chunks(self, entity_name: str, hops: int = 1) -> list[str]:
-        """Get chunk IDs connected to an entity and its neighbors."""
-        neighbors = self.get_neighbors(entity_name, hops)
-        neighbors.append(entity_name)
+    def get_neighbors_with_distance(self, entity_name: str, hops: int = 1) -> dict[str, int]:
+        """Map each entity within N hops to its minimum hop distance (0 = itself)."""
+        with self._lock:
+            if entity_name not in self._graph:
+                return {}
 
-        chunk_ids = set()
+            distance = {entity_name: 0}
+            frontier = {entity_name}
+            for hop in range(1, hops + 1):
+                next_frontier = set()
+                for node in frontier:
+                    for neighbor in self._graph.neighbors(node):
+                        if neighbor not in distance:
+                            distance[neighbor] = hop
+                            next_frontier.add(neighbor)
+                frontier = next_frontier
+            return distance
+
+    def get_connected_chunks_ranked(self, entity_name: str, hops: int = 1) -> dict[str, int]:
+        """Map connected chunk IDs to the min hop distance of a referencing entity.
+
+        A chunk reachable via a 1-hop neighbour is more relevant than one only
+        reachable at 2 hops, so callers can prioritise the nearest connections
+        when a result cap forces a choice.
+        """
+        distances = self.get_neighbors_with_distance(entity_name, hops)
+        if not distances:
+            return {}
+
+        chunk_distance: dict[str, int] = {}
+
+        def note(chunk_id: str, dist: int) -> None:
+            if chunk_id not in chunk_distance or dist < chunk_distance[chunk_id]:
+                chunk_distance[chunk_id] = dist
+
         with self._conn() as conn:
-            for name in neighbors:
+            for name, dist in distances.items():
                 # Direct entity→chunk mappings (primary source)
                 rows = conn.execute(
                     "SELECT chunk_id FROM entity_chunks WHERE entity_name = ?",
                     (name,),
                 ).fetchall()
                 for row in rows:
-                    chunk_ids.add(row["chunk_id"])
+                    note(row["chunk_id"], dist)
 
                 # Co-occurrence edges (supplementary)
                 edges = conn.execute(
@@ -202,10 +231,15 @@ class KnowledgeGraph:
                     (name, name),
                 ).fetchall()
                 for edge in edges:
-                    chunks = json.loads(edge["co_occurrence_chunks"])
-                    chunk_ids.update(chunks)
+                    for chunk_id in json.loads(edge["co_occurrence_chunks"]):
+                        note(chunk_id, dist)
 
-        return sorted(chunk_ids)
+        return chunk_distance
+
+    def get_connected_chunks(self, entity_name: str, hops: int = 1) -> list[str]:
+        """Get chunk IDs connected to an entity and its neighbors, nearest first."""
+        ranked = self.get_connected_chunks_ranked(entity_name, hops)
+        return sorted(ranked, key=lambda chunk_id: (ranked[chunk_id], chunk_id))
 
     def get_entity(self, name: str) -> Entity | None:
         """Get entity details."""
