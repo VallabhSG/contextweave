@@ -81,6 +81,15 @@ test), so de-duplication must live in the assembly layer, never in the retriever
 - [ ] **Backfill after truncation** — `ContextBudgeter.assemble` breaks after
       truncating the last-fitting memory; a shorter later candidate could still
       fill remaining budget. Packing efficiency, not correctness.
+- [x] **FTS Porter stemming** — the `chunks_fts` table now uses
+      `tokenize = 'porter unicode61'`, so morphological variants match ("spending"
+      hits "spend", "finances" hits "finance"). Measured: MRR 0.78 → 0.83. Applies
+      to fresh databases; see the rebuild item below for existing ones.
+- [ ] **FTS tokenizer rebuild + Postgres stemming** — the porter tokenizer only
+      takes effect on newly-created `chunks_fts` tables (SQLite `CREATE ... IF NOT
+      EXISTS` won't alter an existing one), and the Postgres path uses `tsvector`
+      separately. Add a rebuild-if-tokenizer-differs step and a stemmed tsvector
+      config so existing local DBs and production both benefit.
 - [ ] **Real tokenizer (optional)** — the budgeter uses a chars/4 heuristic;
       allow injecting a true tokenizer for exact accounting without adding a
       hard dependency.
@@ -108,6 +117,14 @@ test), so de-duplication must live in the assembly layer, never in the retriever
    the property, not the plumbing.
 
 ## Changelog
+
+### 2026-07-30 — FTS Porter stemming (eval-driven)
+- `chunks_fts` now uses `tokenize = 'porter unicode61'`, so keyword search
+  matches morphological variants ("spending"→"spend", "finances"→"finance",
+  "running"→"run"). **Measured: MRR 0.78 → 0.83** (two rank-2 queries → rank 1);
+  eval MRR baseline raised 0.7 → 0.8. Applies to fresh DBs (rebuild for existing
+  ones logged to backlog).
+- Tests: `test_fts_search_stems_word_variants`. Full suite 166 passed.
 
 ### 2026-07-30 — FTS robustness + OR semantics (eval-driven)
 - `search_fts` now strips all punctuation (a `?` previously broke FTS5 MATCH)

@@ -87,5 +87,6 @@ def test_hit_at_5_meets_baseline(evaluated):
 def test_mrr_meets_baseline(evaluated):
     reciprocal = sum(1.0 / (rank + 1) for _, _, rank in evaluated if rank is not None)
     mrr = reciprocal / len(evaluated)
-    # Baseline raised from 0.6 to 0.7 after FTS OR-semantics lifted MRR to ~0.78.
-    assert mrr >= 0.7, f"MRR={mrr:.2f}"
+    # Baseline history: 0.6 → 0.7 (FTS OR-semantics, ~0.78) → 0.8 (Porter
+    # stemming, ~0.83). Raised as each measured gain lands, to guard regressions.
+    assert mrr >= 0.8, f"MRR={mrr:.2f}"

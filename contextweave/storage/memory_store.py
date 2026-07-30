@@ -57,10 +57,14 @@ CREATE TABLE IF NOT EXISTS digests (
     payload TEXT NOT NULL
 );
 
+-- Porter stemming so morphological variants match: a query for "spending" or
+-- "finances" hits a note about "spend" or "finance". Applies to freshly-created
+-- databases; an existing chunks_fts keeps its tokenizer until rebuilt.
 CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
     id UNINDEXED,
     content,
-    entities
+    entities,
+    tokenize = 'porter unicode61'
 );
 
 CREATE INDEX IF NOT EXISTS idx_chunks_event ON chunks(event_id);
