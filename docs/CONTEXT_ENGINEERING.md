@@ -63,8 +63,23 @@ test), so de-duplication must live in the assembly layer, never in the retriever
 - [ ] **Query-adaptive fusion weights** — decay is now intent-aware (above), but
       the vector/FTS/graph *fusion* weights are still fixed 0.5/0.3/0.2 for every
       query type; a `cross_reference` query should lean harder on the graph.
-- [ ] **Pre-decay relevance channel** — expose the un-decayed relevance on
-      `QueryResult` so confidence can separate "old" from "irrelevant".
+- [x] **Pre-decay relevance channel** — `QueryResult.relevance` now carries the
+      un-decayed fused relevance, and confidence reads *that* rather than the
+      decay-tuned `score`. Fixes an incoherence introduced by iterations 1+2:
+      the same query reported very different confidence depending only on whether
+      it was classified `temporal` (which relaxes decay and so inflated `score`).
+      Ranking still uses `score`; confidence now judges match quality alone.
+- [ ] **Query-adaptive fusion weights** — vector/FTS/graph weights are still
+      fixed 0.5/0.3/0.2; a `cross_reference` query should lean on the graph.
+      (Note: the BM25 saturating normalization lowered FTS's *effective*
+      contribution for strong keyword matches vs. the old hard clip — revisit `k`
+      or move to set-relative FTS scaling when tuning fusion weights.)
+- [ ] **Graph expansion priority by hop distance** — `graph_chunk_ids` is now
+      iterated in sorted order for determinism, but the 50-chunk cap should
+      prefer nearer (1-hop) connections over farther ones.
+- [ ] **Backfill after truncation** — `ContextBudgeter.assemble` breaks after
+      truncating the last-fitting memory; a shorter later candidate could still
+      fill remaining budget. Packing efficiency, not correctness.
 - [ ] **Real tokenizer (optional)** — the budgeter uses a chars/4 heuristic;
       allow injecting a true tokenizer for exact accounting without adding a
       hard dependency.
@@ -84,6 +99,17 @@ test), so de-duplication must live in the assembly layer, never in the retriever
    the property, not the plumbing.
 
 ## Changelog
+
+### 2026-07-30 — Confidence coherence (pre-decay relevance channel)
+- Added `QueryResult.relevance` (pre-decay fused relevance, clamped to [0,1]).
+- `ContextBudgeter._confidence` reads `relevance`, not `score`, so confidence no
+  longer swings with temporal decay or query classification — it reflects how
+  well context matches the query. (Found via review: temporal-classified queries
+  had been reporting up to ~70× higher confidence for identical relevance.)
+- Made graph-expansion chunk iteration deterministic (`sorted`) so the 50-chunk
+  cap is stable across `PYTHONHASHSEED`.
+- Tests: coherence case in `tests/test_context_budget.py`; `make_result` now sets
+  `relevance`. Full suite 141 passed.
 
 ### 2026-07-30 — Retrieval fusion quality (graph seeding + BM25 normalization)
 - `HybridRetriever` now seeds graph expansion from FTS matches too, not only

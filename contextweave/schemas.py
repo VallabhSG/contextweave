@@ -76,11 +76,19 @@ class Entity(BaseModel):
 
 
 class QueryResult(BaseModel):
-    """A single result from hybrid retrieval."""
+    """A single result from hybrid retrieval.
+
+    ``score`` is the final ranking score (fused relevance × temporal decay ×
+    boosts) and determines ordering. ``relevance`` is the pre-decay fused
+    relevance — the same memory scores the same regardless of how recency or
+    query intent affect ranking — so confidence can be judged on how well the
+    context matches the query, not on how the ranking was tuned.
+    """
 
     chunk_id: str
     content: str
     score: float
+    relevance: float = 0.0
     source: SourceType
     timestamp: datetime
     entities: list[str] = Field(default_factory=list)

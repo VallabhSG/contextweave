@@ -151,8 +151,10 @@ class HybridRetriever:
         # connected chunks they missed (this is what "connects the dots":
         # a chunk with no lexical or semantic overlap still surfaces when
         # it shares entities with the ones that matched)
+        # sorted() keeps the added_from_graph cap deterministic — set iteration
+        # order over strings varies with PYTHONHASHSEED across processes.
         added_from_graph = 0
-        for chunk_id in graph_chunk_ids:
+        for chunk_id in sorted(graph_chunk_ids):
             if chunk_id in scored:
                 scored[chunk_id]["graph_score"] = 0.3
                 continue
@@ -208,6 +210,10 @@ class HybridRetriever:
                     chunk_id=item["chunk_id"],
                     content=item["content"],
                     score=importance,
+                    # Pre-decay fused relevance (clamped: 1 - cosine_distance can
+                    # go slightly negative). Confidence reads this, not `score`,
+                    # so it doesn't inherit temporal decay or intent tuning.
+                    relevance=max(0.0, min(1.0, combined)),
                     source=source,
                     timestamp=ts,
                     entities=entities,

@@ -17,11 +17,14 @@ from contextweave.schemas import QueryResult, SourceType
 from contextweave.timeutils import utcnow
 
 
-def make_result(chunk_id: str, content: str, score: float = 0.5) -> QueryResult:
+def make_result(
+    chunk_id: str, content: str, score: float = 0.5, relevance: float | None = None
+) -> QueryResult:
     return QueryResult(
         chunk_id=chunk_id,
         content=content,
         score=score,
+        relevance=score if relevance is None else relevance,
         source=SourceType.NOTE,
         timestamp=utcnow(),
         entities=[],
@@ -124,6 +127,21 @@ class TestConfidenceCalibration:
         one = [make_result("s", distinct("solo", 20), score=0.85)]
         conf = ContextBudgeter(token_budget=5000).assemble(one).confidence
         assert 0.4 < conf < 0.85, "a lone strong match is moderately, not maximally, confident"
+
+    def test_confidence_uses_relevance_not_decayed_score(self):
+        """Confidence must reflect match quality, not the decay-tuned ranking score.
+
+        A memory that is highly relevant but heavily decayed (low `score`, e.g. an
+        old note under default decay) should still read as confident context —
+        otherwise confidence swings purely on how ranking was tuned or how a query
+        was classified.
+        """
+        decayed_but_relevant = [
+            make_result(f"d{i}", distinct(f"topic{i}", 8), score=0.05, relevance=0.9)
+            for i in range(3)
+        ]
+        conf = ContextBudgeter(token_budget=5000).assemble(decayed_but_relevant).confidence
+        assert conf > 0.7, "confidence should track pre-decay relevance, not the decayed score"
 
     def test_breadth_raises_confidence_at_equal_peak(self):
         budgeter = ContextBudgeter(token_budget=5000)

@@ -172,16 +172,19 @@ class ContextBudgeter:
 
     @staticmethod
     def _confidence(packed: list[QueryResult]) -> float:
-        """Confidence from packed relevance, not result count.
+        """Confidence from packed relevance, not result count or ranking score.
 
-        Driven by the strongest match (``peak``) and the mean of the top few,
-        then nudged up modestly by breadth (distinct corroborating memories).
-        Eight weakly-relevant memories now yield low confidence — the whole
-        point of not tying confidence to raw count.
+        Reads ``relevance`` (pre-decay fused match quality), not ``score`` (which
+        carries temporal decay and intent tuning) — so confidence answers "how
+        well does this context match the query?" and does not swing just because
+        a query was classified as temporal. Driven by the strongest match
+        (``peak``) and the mean of the top few, nudged up modestly by breadth
+        (distinct corroborating memories). Eight weakly-relevant memories yield
+        low confidence — the whole point of not tying confidence to raw count.
         """
         if not packed:
             return 0.0
-        scores = sorted((r.score for r in packed), reverse=True)
+        scores = sorted((r.relevance for r in packed), reverse=True)
         top = scores[:3]
         peak = top[0]
         mean_top = sum(top) / len(top)
