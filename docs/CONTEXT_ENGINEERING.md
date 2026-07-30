@@ -60,20 +60,20 @@ test), so de-duplication must live in the assembly layer, never in the retriever
       with a smooth saturating curve (`strength / (strength + k)`), so FTS
       relevance composes predictably with the vector score and strong matches no
       longer collapse to an identical clipped 1.0.
-- [ ] **Query-adaptive fusion weights** — decay is now intent-aware (above), but
-      the vector/FTS/graph *fusion* weights are still fixed 0.5/0.3/0.2 for every
-      query type; a `cross_reference` query should lean harder on the graph.
 - [x] **Pre-decay relevance channel** — `QueryResult.relevance` now carries the
       un-decayed fused relevance, and confidence reads *that* rather than the
       decay-tuned `score`. Fixes an incoherence introduced by iterations 1+2:
       the same query reported very different confidence depending only on whether
       it was classified `temporal` (which relaxes decay and so inflated `score`).
       Ranking still uses `score`; confidence now judges match quality alone.
-- [ ] **Query-adaptive fusion weights** — vector/FTS/graph weights are still
-      fixed 0.5/0.3/0.2; a `cross_reference` query should lean on the graph.
+- [x] **Query-adaptive fusion weights** — connection-oriented intents now shift
+      fusion weight toward the graph: `cross_reference` 0.4/0.2/0.4 and `patterns`
+      0.45/0.2/0.35, while every other intent keeps the balanced 0.5/0.3/0.2
+      (weights sum to 1.0 so scores stay comparable). Only intents *explicitly*
+      about connections deviate, avoiding arbitrary per-type tuning.
       (Note: the BM25 saturating normalization lowered FTS's *effective*
       contribution for strong keyword matches vs. the old hard clip — revisit `k`
-      or move to set-relative FTS scaling when tuning fusion weights.)
+      or move to set-relative FTS scaling if fusion needs further tuning.)
 - [x] **Graph expansion priority by hop distance** — graph traversal now tracks
       each chunk's minimum hop distance (`get_connected_chunks_ranked`), and the
       retriever's 50-chunk cap keeps the *nearest* connections instead of
@@ -102,6 +102,15 @@ test), so de-duplication must live in the assembly layer, never in the retriever
    the property, not the plumbing.
 
 ## Changelog
+
+### 2026-07-30 — Query-adaptive fusion weights
+- `fusion_weights(intent)` returns (vector, fts, graph) weights per query intent;
+  `cross_reference` (0.4/0.2/0.4) and `patterns` (0.45/0.2/0.35) lean on the
+  graph, all others keep 0.5/0.3/0.2. Weights sum to 1.0 so scores stay
+  comparable, and only connection-oriented intents deviate.
+- `HybridRetriever` fuses with the intent's weights (intent already detected for
+  decay). General-intent queries are unchanged.
+- Tests: `TestFusionWeights` in `tests/test_hybrid_retriever.py`. Full suite 157.
 
 ### 2026-07-30 — Hop-distance graph prioritization
 - `KnowledgeGraph.get_neighbors_with_distance` / `get_connected_chunks_ranked`

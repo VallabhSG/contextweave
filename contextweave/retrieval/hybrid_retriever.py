@@ -30,6 +30,23 @@ def _normalize_fts_rank(rank: float) -> float:
     return strength / (strength + _FTS_SATURATION_K)
 
 
+# Query-adaptive fusion weights (vector, fts, graph), each summing to 1.0 so
+# scores stay comparable across intents. Only intents that are *explicitly about
+# connections* lean on the graph; everything else keeps the balanced default —
+# so behaviour for ordinary queries is unchanged.
+_FUSION_WEIGHTS: dict[str, tuple[float, float, float]] = {
+    "general": (0.5, 0.3, 0.2),
+    "cross_reference": (0.4, 0.2, 0.4),  # "how do X and Y connect?" → trust the graph
+    "patterns": (0.45, 0.2, 0.35),  # recurring themes emerge from co-occurrence
+}
+_DEFAULT_FUSION = _FUSION_WEIGHTS["general"]
+
+
+def fusion_weights(intent: str) -> tuple[float, float, float]:
+    """Return (vector, fts, graph) fusion weights for a query intent."""
+    return _FUSION_WEIGHTS.get(intent, _DEFAULT_FUSION)
+
+
 class HybridRetriever:
     """Multi-signal retrieval: vector + FTS + graph, fused and reranked."""
 
@@ -183,11 +200,15 @@ class HybridRetriever:
         # 5. Compute final scores
         access_counts = self.memory_store.access_counts_by_chunk()
 
+        # Query-adaptive fusion: connection-oriented intents lean on the graph.
+        w_vector, w_fts, w_graph = fusion_weights(intent)
+
         results = []
         for item in scored.values():
-            # Weighted fusion: 50% vector + 30% FTS + 20% graph
             combined = (
-                0.5 * item["vector_score"] + 0.3 * item["fts_score"] + 0.2 * item["graph_score"]
+                w_vector * item["vector_score"]
+                + w_fts * item["fts_score"]
+                + w_graph * item["graph_score"]
             )
 
             # Apply temporal decay, access-frequency boost, and connection boost
