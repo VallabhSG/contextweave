@@ -145,6 +145,32 @@ class TestPostgresMode:
         assert health["memories"] == 1
         assert health["vectors"] == 1
 
+    def test_fts_uses_or_semantics(self, pg_client):
+        # Store-level so vector search (faked to one shared vector) can't mask FTS.
+        from uuid import uuid4
+
+        from contextweave.schemas import Chunk, SourceType
+        from contextweave.storage.postgres import PgMemoryStore
+        from contextweave.timeutils import utcnow
+
+        store = PgMemoryStore("fts_or_" + uuid4().hex[:8])
+        store.save_chunk(
+            Chunk(
+                event_id=str(uuid4()),
+                content="Cut the cloud budget by twenty percent this quarter.",
+                start_idx=0,
+                end_idx=0,
+                timestamp=utcnow(),
+                source=SourceType.NOTE,
+            )
+        )
+        # Only "budget" is shared. Old implicit-AND ('budget' & 'worri') matched
+        # nothing; OR semantics must still surface the note.
+        results = store.search_fts("budget worries")
+        assert any("budget" in r["content"].lower() for r in results), (
+            "FTS should OR the query terms, not require all of them"
+        )
+
     def test_workspace_isolation(self, pg_client):
         _, key_a = _register(pg_client)
         _, key_b = _register(pg_client)

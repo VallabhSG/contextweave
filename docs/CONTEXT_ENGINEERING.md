@@ -85,11 +85,16 @@ test), so de-duplication must live in the assembly layer, never in the retriever
       `tokenize = 'porter unicode61'`, so morphological variants match ("spending"
       hits "spend", "finances" hits "finance"). Measured: MRR 0.78 → 0.83. Applies
       to fresh databases; see the rebuild item below for existing ones.
-- [ ] **FTS tokenizer rebuild + Postgres stemming** — the porter tokenizer only
-      takes effect on newly-created `chunks_fts` tables (SQLite `CREATE ... IF NOT
-      EXISTS` won't alter an existing one), and the Postgres path uses `tsvector`
-      separately. Add a rebuild-if-tokenizer-differs step and a stemmed tsvector
-      config so existing local DBs and production both benefit.
+- [x] **Postgres FTS parity (OR semantics)** — the Postgres path already stemmed
+      (`to_tsvector('english', …)`) but used `websearch_to_tsquery`'s implicit AND,
+      so it was dormant for natural-language questions just like SQLite was. Now
+      ORs the stemmed lexemes (`plainto_tsquery` → swap `&`→`|` → `to_tsquery`).
+      Verified against a real pgvector container (store-level OR test + full PG
+      suite, 8 passed). This brings the retrieval gains to the *production* path.
+- [ ] **SQLite FTS tokenizer rebuild for existing DBs** — the porter tokenizer
+      only takes effect on newly-created `chunks_fts` tables (SQLite `CREATE ...
+      IF NOT EXISTS` won't alter an existing one). Add a rebuild-if-tokenizer-
+      differs step so existing local databases pick up stemming without a wipe.
 - [ ] **Real tokenizer (optional)** — the budgeter uses a chars/4 heuristic;
       allow injecting a true tokenizer for exact accounting without adding a
       hard dependency.
@@ -117,6 +122,16 @@ test), so de-duplication must live in the assembly layer, never in the retriever
    the property, not the plumbing.
 
 ## Changelog
+
+### 2026-07-31 — Postgres FTS parity (OR semantics)
+- The Postgres/`tsvector` path (what production runs) already stemmed via the
+  `english` config but used `websearch_to_tsquery`'s implicit AND — dormant for
+  natural-language questions, exactly the SQLite problem. `PgMemoryStore.search_fts`
+  now ORs the stemmed lexemes: `plainto_tsquery('english', q)` lexes/stems/removes
+  stopwords, its `&` operators are swapped to `|`, and `to_tsquery('simple', …)`
+  re-parses. Brings the keyword-recall gains to production.
+- Verified against a real pgvector container: a store-level OR-isolation test
+  (`test_fts_uses_or_semantics`) plus the full Postgres suite (8 passed).
 
 ### 2026-07-30 — FTS Porter stemming (eval-driven)
 - `chunks_fts` now uses `tokenize = 'porter unicode61'`, so keyword search

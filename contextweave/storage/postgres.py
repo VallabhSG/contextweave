@@ -254,21 +254,30 @@ class PgMemoryStore:
         return self._row_to_chunk(row) if row else None
 
     def search_fts(self, query: str, limit: int = 20) -> list[dict]:
-        """Full-text search via websearch_to_tsquery.
+        """Full-text search with OR semantics over stemmed lexemes.
 
-        Ranks are normalized per result set and emitted on the bm25-like
-        negative scale the retriever expects (top hit ≈ -10 → score 1.0).
+        ``to_tsvector('english', …)`` already stems the content; the query side
+        matched via ``websearch_to_tsquery``, whose implicit AND required every
+        word present — dormant for a natural-language question. Instead, lex and
+        stem the query with ``plainto_tsquery`` (safe against any punctuation and
+        stopwords), then OR the resulting lexemes so a memory sharing any term
+        matches, ranked by ``ts_rank_cd``. Ranks are normalized per result set
+        onto the bm25-like negative scale the retriever expects.
         """
         if not query.strip():
             return []
         with self._pool.connection() as conn:
             rows = conn.execute(
+                "WITH q AS ("
+                "  SELECT to_tsquery('simple', "
+                "    replace(plainto_tsquery('english', %s)::text, ' & ', ' | ')) AS tsq"
+                ") "
                 "SELECT id, content, source, timestamp, entities, "
-                "ts_rank_cd(fts, websearch_to_tsquery('english', %s)) AS rank "
-                "FROM cw_chunks "
-                "WHERE user_id = %s AND fts @@ websearch_to_tsquery('english', %s) "
+                "ts_rank_cd(fts, q.tsq) AS rank "
+                "FROM cw_chunks, q "
+                "WHERE user_id = %s AND fts @@ q.tsq "
                 "ORDER BY rank DESC LIMIT %s",
-                (query, self._user_id, query, limit),
+                (query, self._user_id, limit),
             ).fetchall()
         if not rows:
             return []
