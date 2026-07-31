@@ -52,9 +52,26 @@ class Settings(BaseSettings):
     retrieval_final_k: int = 8
     graph_hop_depth: int = 2
 
+    # Context assembly: how much retrieved memory (estimated tokens) may enter
+    # the LLM prompt, and the lexical-overlap threshold above which a memory is
+    # treated as a near-duplicate and skipped to keep the context diverse.
+    context_token_budget: int = 3000
+    context_redundancy_threshold: float = 0.82
+    # A memory longer than this is compressed to its most query-relevant
+    # sentences before packing, so the budget holds more on-point context.
+    context_max_tokens_per_memory: int = 200
+    # Below this assembled confidence, the answer is told to hedge explicitly
+    # rather than confidently fill gaps from sparse/weak context.
+    context_low_confidence_threshold: float = 0.35
+
     decay_half_life_days: float = 30.0
     access_boost_factor: float = 1.2
     connection_density_weight: float = 0.3
+
+    # Intent-aware retrieval: for temporal queries ("how has X evolved over
+    # time?") the history is the answer, so decay is relaxed to this much longer
+    # half-life instead of burying old memories under the default 30-day decay.
+    temporal_query_half_life_days: float = 365.0
 
     host: str = "0.0.0.0"
     port: int = 8000

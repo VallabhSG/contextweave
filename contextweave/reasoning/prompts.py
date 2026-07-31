@@ -14,6 +14,20 @@ Your role is to:
 When referencing context, use the format: [source: timestamp] to cite memories."""
 
 
+# Appended to the user prompt when assembled confidence is low: the retrieved
+# context is sparse or weak, so the model should hedge rather than confabulate.
+LOW_CONFIDENCE_GUIDANCE = (
+    "\n\nIMPORTANT — the retrieved context is sparse or only weakly related to this "
+    "question. Answer only what the context directly supports, state plainly what is "
+    "missing or uncertain, and do not fill gaps with speculation."
+)
+
+# Appended to the no-LLM fallback answer when confidence is low.
+LOW_CONFIDENCE_NOTE = (
+    "\n_Note: little strongly-relevant context was found — this answer may be incomplete._"
+)
+
+
 GENERAL_QUERY_PROMPT = """Based on the following personal context memories, answer the user's question.
 
 ## Retrieved Context

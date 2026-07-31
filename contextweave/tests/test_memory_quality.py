@@ -102,6 +102,32 @@ class TestTemporalDecay:
         assert quarter == pytest.approx(0.075, abs=0.02)
 
 
+class TestIntentAwareDecay:
+    def test_temporal_intent_relaxes_decay_for_old_memory(self, ws):
+        # A 200-day-old reflection is heavily decayed under the default 30-day
+        # half-life — but a temporal query ("how has this evolved?") wants exactly
+        # this history surfaced, so intent-aware retrieval relaxes the decay.
+        ingest(
+            ws,
+            "Recurring reflection: I want to build a personal knowledge garden.",
+            days_ago=200,
+        )
+
+        q = "personal knowledge garden reflection"
+        default = ws.retriever.retrieve(q)
+        temporal = ws.retriever.retrieve(q, query_type="temporal")
+
+        def score_of(results):
+            return next((r.score for r in results if "knowledge garden" in r.content), 0.0)
+
+        default_score = score_of(default)
+        temporal_score = score_of(temporal)
+        assert default_score > 0.0 and temporal_score > 0.0, "memory retrieved under both intents"
+        assert temporal_score > default_score * 2, (
+            "relaxing decay for a temporal query should substantially raise an old memory's score"
+        )
+
+
 class TestAccessBoost:
     def test_recalled_memories_rank_higher(self, ws):
         ingest(ws, "Sketch for the reading tracker app, option Alpha: minimal list.", days_ago=30)
@@ -162,6 +188,25 @@ class TestGraphExpansion:
         tomato_rank = next((i for i, c in enumerate(order) if "tomato" in c), len(order))
         assert falcon_rank < tomato_rank, (
             "the graph-connected chunk should outrank the unrelated one"
+        )
+
+    def test_graph_expansion_survives_vector_outage(self, ws, monkeypatch):
+        # Graph seeds must not come from vector hits alone: when embedding is
+        # down, keyword (FTS) matches still drive graph expansion.
+        ingest(ws, "Spoke with Dana Whitfield about the funding options for Project Falcon.")
+        ingest(ws, "The prototype for Project Falcon needs a dedicated hardware fund.")
+
+        def boom(*_args, **_kwargs):
+            raise RuntimeError("embedding backend down")
+
+        monkeypatch.setattr(ws.retriever.embedder, "embed_query", boom)
+
+        results = ws.retriever.retrieve("Dana Whitfield funding")
+        contents = [r.content for r in results]
+
+        assert any("Dana Whitfield" in c for c in contents), "keyword match still retrieved"
+        assert any("prototype" in c for c in contents), (
+            "FTS-seeded graph expansion should still reach the connected Falcon chunk"
         )
 
 

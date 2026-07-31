@@ -7,18 +7,17 @@ import logging
 import re
 
 from contextweave.config import settings
-from contextweave.reasoning.prompts import QUERY_TYPE_PROMPTS, SYSTEM_PROMPT
+from contextweave.reasoning.context_budget import AssembledContext, ContextBudgeter
+from contextweave.reasoning.prompts import (
+    LOW_CONFIDENCE_GUIDANCE,
+    LOW_CONFIDENCE_NOTE,
+    QUERY_TYPE_PROMPTS,
+    SYSTEM_PROMPT,
+)
+from contextweave.reasoning.query_intent import detect_query_type
 from contextweave.schemas import QueryResult, ReasoningResponse
 
 logger = logging.getLogger(__name__)
-
-QUERY_TYPE_HINTS = {
-    "patterns": ["pattern", "trend", "recurring", "often", "usually", "tend to"],
-    "gaps": ["avoiding", "missing", "overlooking", "neglecting", "forgot"],
-    "temporal": ["evolved", "changed", "over time", "progression", "shift"],
-    "cross_reference": ["think about", "opinion on", "what does", "relationship between"],
-    "priorities": ["focus", "prioritize", "this week", "next", "should I", "what's important"],
-}
 
 SOURCE_CREDIBILITY = {
     "calendar": "factual",
@@ -35,6 +34,11 @@ class ReasoningEngine:
         self._api_key = api_key or settings.groq_api_key
         self._model_name = settings.reasoning_model
         self._client = None
+        self._budgeter = ContextBudgeter(
+            token_budget=settings.context_token_budget,
+            redundancy_threshold=settings.context_redundancy_threshold,
+            max_tokens_per_memory=settings.context_max_tokens_per_memory,
+        )
 
     def _get_client(self):
         if self._client is None:
@@ -105,18 +109,22 @@ class ReasoningEngine:
                 confidence=0.0,
                 query_type=query_type or "general",
             )
-        detected_type = query_type or self._detect_query_type(query)
+        detected_type = query_type or detect_query_type(query)
         suggested = []
         if knowledge_graph:
             try:
                 suggested = self.suggest_queries(results, knowledge_graph)
             except Exception as e:
                 logger.warning("Suggestion generation failed: %s", e)
+
+        # Select which memories actually enter the prompt: packed to a token
+        # budget with near-duplicates suppressed. Confidence is calibrated on
+        # what we packed, not on how many rows retrieval happened to return.
+        assembled = self._budgeter.assemble(results, query=query)
+
         if not self._api_key:
-            return self._fallback_response(query, results, detected_type, suggested)
-        prompt_template = QUERY_TYPE_PROMPTS.get(detected_type, QUERY_TYPE_PROMPTS["general"])
-        context_str = self._format_context(results)
-        prompt = prompt_template.format(context=context_str, query=query)
+            return self._fallback_response(query, assembled, detected_type, suggested)
+        prompt = self._build_prompt(query, assembled.results, detected_type, assembled.confidence)
         try:
             client = self._get_client()
             response = client.chat.completions.create(
@@ -129,7 +137,6 @@ class ReasoningEngine:
                 max_tokens=2048,
             )
             answer = response.choices[0].message.content
-            confidence = min(1.0, len(results) / 8 * 0.8 + 0.2)
             patterns = []
             for line in answer.split("\n"):
                 line = line.strip()
@@ -137,40 +144,48 @@ class ReasoningEngine:
                     patterns.append(line.lstrip("- "))
             return ReasoningResponse(
                 answer=answer,
-                cited_memories=[r.chunk_id for r in results[:5]],
-                confidence=confidence,
+                cited_memories=[r.chunk_id for r in assembled.results[:5]],
+                confidence=assembled.confidence,
                 patterns=patterns[:10],
                 query_type=detected_type,
                 suggested_queries=suggested,
             )
         except Exception as e:
             logger.error("Reasoning failed: %s", e)
-            return self._fallback_response(query, results, detected_type, suggested)
+            return self._fallback_response(query, assembled, detected_type, suggested)
 
-    def _fallback_response(self, query, results, query_type, suggested=None):
+    def _build_prompt(
+        self, query: str, results: list[QueryResult], query_type: str, confidence: float
+    ) -> str:
+        """Format the reasoning prompt, adding a hedge instruction on weak context."""
+        template = QUERY_TYPE_PROMPTS.get(query_type, QUERY_TYPE_PROMPTS["general"])
+        prompt = template.format(context=self._format_context(results), query=query)
+        if confidence < settings.context_low_confidence_threshold:
+            prompt += LOW_CONFIDENCE_GUIDANCE
+        return prompt
+
+    def _fallback_response(
+        self,
+        query: str,
+        assembled: AssembledContext,
+        query_type: str,
+        suggested: list[str] | None = None,
+    ) -> ReasoningResponse:
+        results = assembled.results
         lines = [f"Found {len(results)} relevant memories for: **{query}**\n"]
         for i, r in enumerate(results[:5], 1):
             ts = r.timestamp.strftime("%Y-%m-%d")
             lines.append(f"{i}. [{r.source.value} · {ts}] {r.content[:200]}...")
+        if assembled.confidence < settings.context_low_confidence_threshold:
+            lines.append(LOW_CONFIDENCE_NOTE)
         return ReasoningResponse(
             answer="\n".join(lines),
             cited_memories=[r.chunk_id for r in results[:5]],
-            confidence=min(1.0, len(results) / 8 * 0.6),
+            confidence=assembled.confidence,
             patterns=[],
             query_type=query_type,
             suggested_queries=suggested or [],
         )
-
-    def _detect_query_type(self, query: str) -> str:
-        query_lower = query.lower()
-        scores = {}
-        for qtype, keywords in QUERY_TYPE_HINTS.items():
-            score = sum(1 for kw in keywords if kw in query_lower)
-            if score > 0:
-                scores[qtype] = score
-        if scores:
-            return max(scores, key=scores.get)
-        return "general"
 
     @staticmethod
     def _format_context(results: list[QueryResult]) -> str:
@@ -180,9 +195,12 @@ class ReasoningEngine:
             entities = ", ".join(r.entities) if r.entities else "none"
             credibility = SOURCE_CREDIBILITY.get(r.source.value, "general")
             lines.append(
+                # Show match quality (relevance), not the decay-tuned ranking
+                # score — otherwise an older-but-on-topic memory reads as
+                # irrelevant to the model and gets wrongly distrusted.
                 f"### Memory {i} [{r.source.value}: {timestamp}] [credibility: {credibility}]\n"
                 f"Entities: {entities}\n"
-                f"Relevance: {r.score:.2f}\n\n"
+                f"Relevance: {r.relevance:.2f}\n\n"
                 f"{r.content}\n"
             )
         return "\n---\n".join(lines)
