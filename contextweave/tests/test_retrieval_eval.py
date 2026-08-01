@@ -33,6 +33,14 @@ CORPUS = [
     "Started reading a book on the history of cartography and old maps.",
     "Watered the tomato plants on the balcony and repotted the basil.",
     "Team retro: we decided to timebox standups to ten minutes.",
+    "Booked flights to Lisbon for the October conference; still need to sort the hotel.",
+    "The car needs an oil change and the left brake pad has started squealing.",
+    "Finished the pottery class tonight — glazed two bowls and a chipped mug.",
+    "Moving part of the emergency fund into a high-yield savings account.",
+    "Debugging the payment webhook: Stripe retries were creating duplicate orders.",
+    "Twelve-day streak learning Spanish on Duolingo, mostly verbs this week.",
+    "Doctor flagged slightly high cholesterol and suggested less red meat.",
+    "Repainted the bedroom a warm off-white over the weekend.",
 ]
 
 # (query, expected substring in a correct result) — lowercased comparison.
@@ -43,12 +51,18 @@ EVAL_CASES = [
     ("funding for Project Falcon", "falcon"),
     ("the reading tracker app idea", "reading tracker"),
     ("what did I discuss with Dana Whitfield?", "dana whitfield"),
+    ("travel plans for the conference", "lisbon"),
+    ("what's wrong with my car?", "brake"),
+    ("where should I move my emergency savings?", "high-yield"),
+    ("the bug causing duplicate orders", "webhook"),
+    ("how is my language learning going?", "spanish"),
+    ("what did the doctor say about my health?", "cholesterol"),
 ]
 
 
 @pytest.fixture(scope="module")
-def evaluated(tmp_path_factory):
-    """Ingest the corpus once, run every case, return per-case first-hit ranks."""
+def eval_ws(tmp_path_factory):
+    """A workspace with the corpus ingested once, shared across the eval tests."""
     mp = pytest.MonkeyPatch()
     base = tmp_path_factory.mktemp("reval")
     mp.setattr(settings, "sqlite_db_path", str(base / "demo.db"))
@@ -63,30 +77,57 @@ def evaluated(tmp_path_factory):
             ws, TextAdapter().ingest_text(text, timestamp=utcnow(), source=SourceType.NOTE)
         )
 
-    ranks = []
-    for query, expect in EVAL_CASES:
-        results = ws.retriever.retrieve(query, top_k=5)
-        rank = next(
-            (i for i, r in enumerate(results) if expect in r.content.lower()),
-            None,
-        )
-        ranks.append((query, expect, rank))
-
-    yield ranks
+    yield ws
     manager.reset()
     mp.undo()
 
 
-def test_hit_at_5_meets_baseline(evaluated):
-    hits = sum(1 for _, _, rank in evaluated if rank is not None)
-    hit_at_5 = hits / len(evaluated)
-    misses = [f"{q!r}→{e!r}" for q, e, rank in evaluated if rank is None]
-    assert hit_at_5 >= 0.8, f"hit@5={hit_at_5:.2f}; missed: {misses}"
+def _first_hit_ranks(ws) -> list[tuple[str, str, int | None]]:
+    """For each case, the 0-indexed rank of the first result containing the target."""
+    ranks = []
+    for query, expect in EVAL_CASES:
+        results = ws.retriever.retrieve(query, top_k=5)
+        rank = next((i for i, r in enumerate(results) if expect in r.content.lower()), None)
+        ranks.append((query, expect, rank))
+    return ranks
 
 
-def test_mrr_meets_baseline(evaluated):
-    reciprocal = sum(1.0 / (rank + 1) for _, _, rank in evaluated if rank is not None)
-    mrr = reciprocal / len(evaluated)
-    # Baseline history: 0.6 → 0.7 (FTS OR-semantics, ~0.78) → 0.8 (Porter
-    # stemming, ~0.83). Raised as each measured gain lands, to guard regressions.
-    assert mrr >= 0.8, f"MRR={mrr:.2f}"
+def _mrr(ranks) -> float:
+    return sum(1.0 / (rank + 1) for _, _, rank in ranks if rank is not None) / len(ranks)
+
+
+def test_hit_at_5_meets_baseline(eval_ws):
+    ranks = _first_hit_ranks(eval_ws)
+    hit_at_5 = sum(1 for _, _, r in ranks if r is not None) / len(ranks)
+    misses = [f"{q!r}→{e!r}" for q, e, r in ranks if r is None]
+    assert hit_at_5 >= 0.9, f"hit@5={hit_at_5:.2f}; missed: {misses}"
+
+
+def test_mrr_meets_baseline(eval_ws):
+    # Fused-only (no reranking). Baseline history on the small set: 0.6 → 0.7
+    # (FTS OR) → 0.8 (Porter stemming). The larger, more diverse set is harder
+    # and less overfit — fused MRR ≈ 0.79, so the floor is 0.75.
+    mrr = _mrr(_first_hit_ranks(eval_ws))
+    assert mrr >= 0.75, f"fused MRR={mrr:.2f}"
+
+
+def test_reranking_improves_mrr(eval_ws):
+    """The production config (cross-encoder reranking) must beat fused and clear 0.9."""
+    try:
+        from fastembed.rerank.cross_encoder import TextCrossEncoder  # noqa: F401
+    except Exception:
+        pytest.skip("fastembed cross-encoder reranker unavailable")
+
+    from contextweave.processing.reranker import CrossEncoderReranker
+
+    fused = _mrr(_first_hit_ranks(eval_ws))
+    eval_ws.retriever.reranker = CrossEncoderReranker("Xenova/ms-marco-MiniLM-L-6-v2")
+    try:
+        reranked = _mrr(_first_hit_ranks(eval_ws))
+    finally:
+        eval_ws.retriever.reranker = None
+
+    assert reranked >= fused, (
+        f"reranking should not hurt: fused={fused:.2f} reranked={reranked:.2f}"
+    )
+    assert reranked >= 0.9, f"reranked MRR={reranked:.2f}"

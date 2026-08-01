@@ -133,6 +133,16 @@ test), so de-duplication must live in the assembly layer, never in the retriever
 
 ## Changelog
 
+### 2026-08-01 — Expanded eval + reranked-quality guard
+- Grew the eval set from 6 cases / 10 notes to **12 cases / 18 notes**, more
+  diverse and realistic — small enough to maintain, large enough to be a real
+  regression guard without overfitting. On the harder set fused MRR is ~0.79
+  (floor 0.75), hit@5 ≥ 0.9.
+- Added `test_reranking_improves_mrr`: runs the **real** cross-encoder over the
+  eval set and asserts reranked MRR ≥ fused **and** ≥ 0.9 (measured **1.00**) —
+  a measured regression guard under the now-shipped production reranking, beyond
+  the fast fake-reranker wiring tests. Skips if the reranker is unavailable.
+
 ### 2026-08-01 — Local cross-encoder reranking (measured MRR 0.83 → 1.00)
 - Added an optional reranking stage: after fused scoring sorts the candidate
   pool, a local ONNX cross-encoder (`processing/reranker.py`, fastembed) reads
