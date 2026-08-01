@@ -375,7 +375,7 @@ All settings use the `CW_` prefix as environment variables:
 | `CW_FALLBACK_API_KEY` | — | Secondary provider API key |
 | `CW_FALLBACK_MODEL` | — | Secondary provider model (e.g. `llama-3.3-70b`) |
 | `CW_DECAY_HALF_LIFE_DAYS` | `30.0` | Memory half-life in days |
-| `CW_RERANK_MODEL` | — | Optional local cross-encoder to rerank retrieval candidates, e.g. `Xenova/ms-marco-MiniLM-L-6-v2`. Off unless set; needs `fastembed >= 0.5` |
+| `CW_RERANK_MODEL` | — | Optional local cross-encoder to rerank retrieval candidates, e.g. `Xenova/ms-marco-MiniLM-L-6-v2`. Off unless set; needs `fastembed >= 0.4`. Enabled in the deployed Docker image |
 | `CW_RETRIEVAL_FINAL_K` | `8` | Max results returned |
 | `CW_RETRIEVAL_TOP_K` | `20` | Candidates per retrieval signal |
 | `CW_GRAPH_HOP_DEPTH` | `2` | Graph traversal depth |

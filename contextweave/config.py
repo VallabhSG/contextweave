@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     # Optional local cross-encoder reranking of the top fused candidates before
     # they reach the LLM — a sharper relevance judge (measured MRR 0.83 → 1.0 on
     # the eval set). Off unless a model is set, e.g. "Xenova/ms-marco-MiniLM-L-6-v2".
-    # Runs locally via fastembed's ONNX rerankers (needs fastembed >= 0.5).
+    # Runs locally via fastembed's ONNX rerankers (needs fastembed >= 0.4).
     rerank_model: str = ""
     rerank_candidates: int = 20
 

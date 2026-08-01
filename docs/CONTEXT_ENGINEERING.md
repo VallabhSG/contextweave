@@ -101,9 +101,10 @@ test), so de-duplication must live in the assembly layer, never in the retriever
       fused scoring: **measured MRR 0.83 → 1.00** on the eval set. Off by default,
       degrades gracefully, no new dependency.
 - [ ] **Align `fastembed` pin** — `requirements.txt` pins `0.4.2` but dev/test
-      run `0.8.0`; tests don't reflect what production builds. Bump to the tested
-      version (also required to *use* reranking in production) after verifying the
-      `bge-small` embeddings are unchanged and re-checking the eval baseline.
+      run `0.8.0`; tests don't reflect what production builds. (Reranking does NOT
+      need the bump — 0.4.2 has the reranker with the same model name.) Bump only
+      after verifying `bge-small` embeddings are unchanged and re-checking the
+      eval baseline; low priority now.
 - [ ] **Real tokenizer (optional)** — the budgeter uses a chars/4 heuristic;
       allow injecting a true tokenizer for exact accounting without adding a
       hard dependency.
@@ -140,7 +141,9 @@ test), so de-duplication must live in the assembly layer, never in the retriever
   to rank 0).
 - Off unless `CW_RERANK_MODEL` is set; injected into `HybridRetriever` and
   cached so weights load once; any failure leaves the fused order untouched.
-  No new dependency (fastembed already present; needs ≥ 0.5 for rerankers).
+  No new dependency (fastembed already present; rerankers exist since 0.4.0, so
+  the pinned 0.4.2 supports it). Enabled in the deployed Docker image via
+  `ENV CW_RERANK_MODEL` so local dev and tests are unaffected.
 - Tests mock the reranker to check ordering + graceful degradation (fast, no
   model load); the real-model uplift was measured via a probe.
 

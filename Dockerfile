@@ -21,6 +21,13 @@ USER appuser
 # Pre-download fastembed model as the runtime user so first ingest is instant
 RUN python -c "from fastembed import TextEmbedding; list(TextEmbedding('BAAI/bge-small-en-v1.5').embed(['warmup']))"
 
+# Enable local cross-encoder reranking in the deployed image (measured MRR
+# 0.83 -> 1.0). Set here rather than in config defaults so local dev and the
+# test suite stay unaffected — only the deployed image reranks. Pre-download the
+# model so the first query is instant.
+ENV CW_RERANK_MODEL=Xenova/ms-marco-MiniLM-L-6-v2
+RUN python -c "from fastembed.rerank.cross_encoder import TextCrossEncoder; list(TextCrossEncoder('Xenova/ms-marco-MiniLM-L-6-v2').rerank('warmup', ['warmup doc']))"
+
 # Copy application code
 COPY --chown=appuser:appuser . .
 
