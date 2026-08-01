@@ -4,7 +4,30 @@ from __future__ import annotations
 
 import pytest
 
-from contextweave.retrieval.hybrid_retriever import _normalize_fts_rank, fusion_weights
+from contextweave.retrieval.hybrid_retriever import (
+    HybridRetriever,
+    _normalize_fts_rank,
+    fusion_weights,
+)
+from contextweave.schemas import QueryResult, SourceType
+from contextweave.timeutils import utcnow
+
+
+def _qr(chunk_id: str, content: str, score: float) -> QueryResult:
+    return QueryResult(
+        chunk_id=chunk_id,
+        content=content,
+        score=score,
+        relevance=score,
+        source=SourceType.NOTE,
+        timestamp=utcnow(),
+        entities=[],
+    )
+
+
+def _retriever(reranker) -> HybridRetriever:
+    # Stores are unused by _apply_rerank; pass None to keep the test light.
+    return HybridRetriever(None, None, None, None, reranker=reranker)
 
 
 class TestFtsNormalization:
@@ -54,3 +77,37 @@ class TestFusionWeights:
 
         graph_only = (0.0, 0.0, 1.0)
         assert fuse("cross_reference", *graph_only) > fuse("general", *graph_only)
+
+
+class _FakeReranker:
+    def __init__(self, scores_by_content: dict[str, float]):
+        self._scores = scores_by_content
+
+    def rerank(self, query: str, documents: list[str]) -> list[float]:
+        return [self._scores.get(d, 0.0) for d in documents]
+
+
+class TestReranking:
+    def test_reorders_by_cross_encoder_score(self):
+        # Fused order is a, b, c; the reranker judges c > b > a.
+        retriever = _retriever(_FakeReranker({"a": 0.1, "b": 0.5, "c": 0.9}))
+        fused = [_qr("1", "a", 0.9), _qr("2", "b", 0.8), _qr("3", "c", 0.7)]
+
+        out = retriever._apply_rerank("q", fused)
+
+        assert [r.content for r in out] == ["c", "b", "a"]
+
+    def test_degrades_gracefully_on_error(self):
+        class _Boom:
+            def rerank(self, query, documents):
+                raise RuntimeError("model unavailable")
+
+        retriever = _retriever(_Boom())
+        fused = [_qr("1", "a", 0.9), _qr("2", "b", 0.8)]
+
+        assert retriever._apply_rerank("q", fused) == fused, "fused order preserved on failure"
+
+    def test_disabled_by_default(self):
+        from contextweave.processing.reranker import get_reranker
+
+        assert get_reranker() is None, "reranking is off unless CW_RERANK_MODEL is set"

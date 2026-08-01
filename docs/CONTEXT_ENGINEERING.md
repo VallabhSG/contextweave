@@ -95,6 +95,15 @@ test), so de-duplication must live in the assembly layer, never in the retriever
       only takes effect on newly-created `chunks_fts` tables (SQLite `CREATE ...
       IF NOT EXISTS` won't alter an existing one). Add a rebuild-if-tokenizer-
       differs step so existing local databases pick up stemming without a wipe.
+- [x] **Cross-encoder reranking** — an optional local ONNX cross-encoder
+      (fastembed, `Xenova/ms-marco-MiniLM-L-6-v2`) reorders the top fused
+      candidates before the LLM. A pairwise relevance judge beats independent
+      fused scoring: **measured MRR 0.83 → 1.00** on the eval set. Off by default,
+      degrades gracefully, no new dependency.
+- [ ] **Align `fastembed` pin** — `requirements.txt` pins `0.4.2` but dev/test
+      run `0.8.0`; tests don't reflect what production builds. Bump to the tested
+      version (also required to *use* reranking in production) after verifying the
+      `bge-small` embeddings are unchanged and re-checking the eval baseline.
 - [ ] **Real tokenizer (optional)** — the budgeter uses a chars/4 heuristic;
       allow injecting a true tokenizer for exact accounting without adding a
       hard dependency.
@@ -122,6 +131,18 @@ test), so de-duplication must live in the assembly layer, never in the retriever
    the property, not the plumbing.
 
 ## Changelog
+
+### 2026-08-01 — Local cross-encoder reranking (measured MRR 0.83 → 1.00)
+- Added an optional reranking stage: after fused scoring sorts the candidate
+  pool, a local ONNX cross-encoder (`processing/reranker.py`, fastembed) reads
+  each (query, memory) pair together and reorders the top `CW_RERANK_CANDIDATES`
+  before the LLM. Measured on the eval harness: **MRR 0.83 → 1.00** (every target
+  to rank 0).
+- Off unless `CW_RERANK_MODEL` is set; injected into `HybridRetriever` and
+  cached so weights load once; any failure leaves the fused order untouched.
+  No new dependency (fastembed already present; needs ≥ 0.5 for rerankers).
+- Tests mock the reranker to check ordering + graceful degradation (fast, no
+  model load); the real-model uplift was measured via a probe.
 
 ### 2026-08-01 — LLM provider fallback (resilience)
 - ContextWeave depended entirely on Groq for reasoning, whose free tier is

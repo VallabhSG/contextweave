@@ -8,6 +8,7 @@ from datetime import datetime
 from contextweave.config import settings
 from contextweave.processing.embedder import LocalEmbedder
 from contextweave.processing.importance_scorer import ImportanceScorer
+from contextweave.processing.reranker import get_reranker
 from contextweave.reasoning.query_intent import detect_query_type
 from contextweave.schemas import QueryResult, SourceType
 from contextweave.storage.knowledge_graph import KnowledgeGraph
@@ -57,12 +58,14 @@ class HybridRetriever:
         knowledge_graph: KnowledgeGraph,
         embedder: LocalEmbedder,
         scorer: ImportanceScorer | None = None,
+        reranker=None,
     ):
         self.vector_store = vector_store
         self.memory_store = memory_store
         self.knowledge_graph = knowledge_graph
         self.embedder = embedder
         self.scorer = scorer or ImportanceScorer()
+        self.reranker = reranker if reranker is not None else get_reranker()
 
     def retrieve(
         self,
@@ -257,9 +260,29 @@ class HybridRetriever:
                 and (date_to is None or r.timestamp <= date_to)
             ]
 
-        # 8. Sort by score descending and return top K
+        # 8. Sort by fused score, optionally rerank the top candidates, return K
         results.sort(key=lambda r: r.score, reverse=True)
+        if self.reranker is not None:
+            results = self._apply_rerank(query, results)
         return results[:final_k]
+
+    def _apply_rerank(self, query: str, results: list[QueryResult]) -> list[QueryResult]:
+        """Reorder the top fused candidates with the cross-encoder (best-effort).
+
+        Fused scoring already selected and decay-weighted the candidate pool; the
+        cross-encoder then picks the most query-relevant among them. Any failure
+        leaves the fused order untouched — reranking never breaks retrieval.
+        """
+        pool = results[: settings.rerank_candidates]
+        if len(pool) < 2:
+            return results
+        try:
+            scores = self.reranker.rerank(query, [r.content for r in pool])
+        except Exception as e:
+            logger.warning("Reranking skipped: %s", e)
+            return results
+        reordered = [r for _, r in sorted(zip(scores, pool), key=lambda p: p[0], reverse=True)]
+        return reordered + results[settings.rerank_candidates :]
 
     @staticmethod
     def _parse_timestamp(ts_str: str) -> datetime:
