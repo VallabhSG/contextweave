@@ -669,25 +669,58 @@ class PgKnowledgeGraph:
                 frontier = next_frontier
         return sorted(visited)
 
-    def get_connected_chunks(self, entity_name: str, hops: int = 1) -> list[str]:
-        neighbors = self.get_neighbors(entity_name, hops)
-        neighbors.append(entity_name)
-        chunk_ids: set[str] = set()
+    def get_neighbors_with_distance(self, entity_name: str, hops: int = 1) -> dict[str, int]:
+        """Map each entity within N hops to its minimum hop distance (0 = itself)."""
+        with self._lock:
+            if entity_name not in self._graph:
+                return {}
+            distance = {entity_name: 0}
+            frontier = {entity_name}
+            for hop in range(1, hops + 1):
+                next_frontier = set()
+                for node in frontier:
+                    for neighbor in self._graph.neighbors(node):
+                        if neighbor not in distance:
+                            distance[neighbor] = hop
+                            next_frontier.add(neighbor)
+                frontier = next_frontier
+            return distance
+
+    def get_connected_chunks_ranked(self, entity_name: str, hops: int = 1) -> dict[str, int]:
+        """Map connected chunk IDs to the min hop distance of a referencing entity."""
+        distances = self.get_neighbors_with_distance(entity_name, hops)
+        if not distances:
+            return {}
+        names = list(distances)
+        chunk_distance: dict[str, int] = {}
+
+        def note(chunk_id: str, dist: int) -> None:
+            if chunk_id not in chunk_distance or dist < chunk_distance[chunk_id]:
+                chunk_distance[chunk_id] = dist
+
         with self._pool.connection() as conn:
-            rows = conn.execute(
-                "SELECT chunk_id FROM cw_entity_chunks "
+            for row in conn.execute(
+                "SELECT entity_name, chunk_id FROM cw_entity_chunks "
                 "WHERE user_id = %s AND entity_name = ANY(%s)",
-                (self._user_id, neighbors),
-            ).fetchall()
-            chunk_ids.update(r["chunk_id"] for r in rows)
-            edges = conn.execute(
-                "SELECT co_occurrence_chunks FROM cw_entity_edges "
+                (self._user_id, names),
+            ).fetchall():
+                note(row["chunk_id"], distances[row["entity_name"]])
+            for edge in conn.execute(
+                "SELECT source, target, co_occurrence_chunks FROM cw_entity_edges "
                 "WHERE user_id = %s AND (source = ANY(%s) OR target = ANY(%s))",
-                (self._user_id, neighbors, neighbors),
-            ).fetchall()
-            for edge in edges:
-                chunk_ids.update(edge["co_occurrence_chunks"] or [])
-        return sorted(chunk_ids)
+                (self._user_id, names, names),
+            ).fetchall():
+                dist = min(
+                    distances.get(edge["source"], 1_000_000),
+                    distances.get(edge["target"], 1_000_000),
+                )
+                for chunk_id in edge["co_occurrence_chunks"] or []:
+                    note(chunk_id, dist)
+        return chunk_distance
+
+    def get_connected_chunks(self, entity_name: str, hops: int = 1) -> list[str]:
+        ranked = self.get_connected_chunks_ranked(entity_name, hops)
+        return sorted(ranked, key=lambda chunk_id: (ranked[chunk_id], chunk_id))
 
     def get_entity(self, name: str) -> Entity | None:
         with self._pool.connection() as conn:

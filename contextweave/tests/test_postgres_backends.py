@@ -171,6 +171,51 @@ class TestPostgresMode:
             "FTS should OR the query terms, not require all of them"
         )
 
+    def test_query_with_graph_expansion(self, pg_client):
+        # Regression: the retriever calls knowledge_graph.get_connected_chunks_ranked,
+        # which PgKnowledgeGraph was missing — so every production query that
+        # surfaced entity-bearing chunks 500'd. Ingest co-occurring entities and
+        # query them so graph expansion actually runs.
+        _, key = _register(pg_client)
+        h = {"X-API-Key": key}
+        for content in [
+            "Spoke with Dana Whitfield about the funding options for Project Falcon.",
+            "The prototype for Project Falcon needs a dedicated hardware fund.",
+        ]:
+            assert (
+                pg_client.post("/api/ingest/text", json={"content": content}, headers=h).status_code
+                == 200
+            )
+
+        r = pg_client.post(
+            "/api/query", json={"query": "what did I discuss with Dana Whitfield?"}, headers=h
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["context_count"] >= 1
+
+    def test_pg_graph_connected_chunks_ranked(self, pg_client):
+        from uuid import uuid4
+
+        from contextweave.schemas import Entity
+        from contextweave.storage.postgres import PgKnowledgeGraph
+        from contextweave.timeutils import utcnow
+
+        kg = PgKnowledgeGraph("kg_" + uuid4().hex[:8])
+        now = utcnow()
+
+        def ent(name):
+            return Entity(name=name, entity_type="topic", first_seen=now, last_seen=now)
+
+        kg.add_entities([ent("A"), ent("B")], "chunk1")  # A-B co-occur in chunk1
+        kg.add_entities([ent("B"), ent("C")], "chunk2")  # B-C co-occur in chunk2
+
+        dist = kg.get_neighbors_with_distance("A", hops=2)
+        assert dist["A"] == 0 and dist["B"] == 1 and dist["C"] == 2
+
+        ranked = kg.get_connected_chunks_ranked("A", hops=2)
+        assert ranked["chunk1"] == 0, "A directly references chunk1"
+        assert ranked["chunk2"] == 1, "chunk2 reached via 1-hop neighbour B"
+
     def test_workspace_isolation(self, pg_client):
         _, key_a = _register(pg_client)
         _, key_b = _register(pg_client)
