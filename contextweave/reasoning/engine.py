@@ -6,6 +6,8 @@ import json
 import logging
 import re
 
+import httpx
+
 from contextweave.config import settings
 from contextweave.reasoning.context_budget import AssembledContext, ContextBudgeter
 from contextweave.reasoning.prompts import (
@@ -46,6 +48,55 @@ class ReasoningEngine:
 
             self._client = Groq(api_key=self._api_key)
         return self._client
+
+    @property
+    def _fallback_ready(self) -> bool:
+        """A secondary OpenAI-compatible provider is fully configured."""
+        return bool(
+            settings.fallback_base_url and settings.fallback_api_key and settings.fallback_model
+        )
+
+    def _complete(self, messages: list[dict], max_tokens: int, temperature: float) -> str | None:
+        """Chat completion via Groq, falling back to the secondary provider.
+
+        Returns the answer text, or ``None`` when no provider succeeds — the
+        caller then degrades to the deterministic no-LLM response.
+        """
+        if self._api_key:
+            try:
+                response = self._get_client().chat.completions.create(
+                    model=self._model_name,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                logger.warning("Primary (Groq) completion failed: %s", e)
+
+        if self._fallback_ready:
+            try:
+                return self._fallback_chat(messages, max_tokens, temperature)
+            except Exception as e:
+                logger.error("Fallback completion failed: %s", e)
+
+        return None
+
+    def _fallback_chat(self, messages: list[dict], max_tokens: int, temperature: float) -> str:
+        """Call the secondary provider's OpenAI-compatible chat endpoint."""
+        response = httpx.post(
+            f"{settings.fallback_base_url.rstrip('/')}/chat/completions",
+            headers={"Authorization": f"Bearer {settings.fallback_api_key}"},
+            json={
+                "model": settings.fallback_model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            },
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
 
     def expand_query(self, query: str) -> list[str]:
         if not self._api_key:
@@ -122,37 +173,34 @@ class ReasoningEngine:
         # what we packed, not on how many rows retrieval happened to return.
         assembled = self._budgeter.assemble(results, query=query)
 
-        if not self._api_key:
+        if not self._api_key and not self._fallback_ready:
             return self._fallback_response(query, assembled, detected_type, suggested)
+
         prompt = self._build_prompt(query, assembled.results, detected_type, assembled.confidence)
-        try:
-            client = self._get_client()
-            response = client.chat.completions.create(
-                model=self._model_name,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.3,
-                max_tokens=2048,
-            )
-            answer = response.choices[0].message.content
-            patterns = []
-            for line in answer.split("\n"):
-                line = line.strip()
-                if line.startswith("- **") or line.startswith("**Pattern"):
-                    patterns.append(line.lstrip("- "))
-            return ReasoningResponse(
-                answer=answer,
-                cited_memories=[r.chunk_id for r in assembled.results[:5]],
-                confidence=assembled.confidence,
-                patterns=patterns[:10],
-                query_type=detected_type,
-                suggested_queries=suggested,
-            )
-        except Exception as e:
-            logger.error("Reasoning failed: %s", e)
+        answer = self._complete(
+            [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=2048,
+            temperature=0.3,
+        )
+        if answer is None:
             return self._fallback_response(query, assembled, detected_type, suggested)
+
+        patterns = []
+        for line in answer.split("\n"):
+            line = line.strip()
+            if line.startswith("- **") or line.startswith("**Pattern"):
+                patterns.append(line.lstrip("- "))
+        return ReasoningResponse(
+            answer=answer,
+            cited_memories=[r.chunk_id for r in assembled.results[:5]],
+            confidence=assembled.confidence,
+            patterns=patterns[:10],
+            query_type=detected_type,
+            suggested_queries=suggested,
+        )
 
     def _build_prompt(
         self, query: str, results: list[QueryResult], query_type: str, confidence: float

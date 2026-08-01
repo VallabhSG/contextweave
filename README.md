@@ -371,6 +371,9 @@ All settings use the `CW_` prefix as environment variables:
 | `CW_EMBEDDING_MODEL` | `BAAI/bge-small-en-v1.5` | Local fastembed model |
 | `CW_REASONING_MODEL` | `llama-3.1-8b-instant` | Groq LLM for reasoning |
 | `CW_EXTRACTION_MODEL` | `llama-3.1-8b-instant` | Groq LLM for entity extraction |
+| `CW_FALLBACK_BASE_URL` | — | Optional secondary OpenAI-compatible LLM, used only if the Groq call fails (e.g. `https://api.cerebras.ai/v1`). Off unless all three `CW_FALLBACK_*` are set |
+| `CW_FALLBACK_API_KEY` | — | Secondary provider API key |
+| `CW_FALLBACK_MODEL` | — | Secondary provider model (e.g. `llama-3.3-70b`) |
 | `CW_DECAY_HALF_LIFE_DAYS` | `30.0` | Memory half-life in days |
 | `CW_RETRIEVAL_FINAL_K` | `8` | Max results returned |
 | `CW_RETRIEVAL_TOP_K` | `20` | Candidates per retrieval signal |

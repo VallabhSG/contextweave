@@ -14,6 +14,15 @@ class Settings(BaseSettings):
     extraction_model: str = "llama-3.1-8b-instant"
     transcription_model: str = "whisper-large-v3-turbo"
 
+    # Optional secondary LLM, used only when the primary (Groq) reasoning call
+    # fails — for resilience and to ease Groq's ~6k tokens/minute free-tier cap.
+    # Any OpenAI-compatible chat endpoint works (Cerebras, OpenRouter, Together,
+    # Groq itself, …). OFF by default: personal context never leaves the box for
+    # a second provider unless you deliberately configure one.
+    fallback_base_url: str = ""  # e.g. https://api.cerebras.ai/v1
+    fallback_api_key: str = ""
+    fallback_model: str = ""  # e.g. llama-3.3-70b
+
     chroma_persist_dir: str = "./chroma_data"
     sqlite_db_path: str = "./contextweave.db"
     data_dir: str = "./data"

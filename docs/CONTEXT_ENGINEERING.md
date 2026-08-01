@@ -123,6 +123,16 @@ test), so de-duplication must live in the assembly layer, never in the retriever
 
 ## Changelog
 
+### 2026-08-01 — LLM provider fallback (resilience)
+- ContextWeave depended entirely on Groq for reasoning, whose free tier is
+  ~6k tokens/minute — a single query (~3k context + 2k output) nearly saturates
+  it. `ReasoningEngine` now tries Groq first, then an optional OpenAI-compatible
+  secondary provider (`CW_FALLBACK_BASE_URL` / `_API_KEY` / `_MODEL`), then the
+  deterministic no-LLM response. The fallback also works when no Groq key is set.
+- OFF by default — personal context never reaches a second provider unless all
+  three vars are configured. Implemented over the existing `httpx` dependency
+  (no new SDK). Tests mock `httpx.post` (still LLM-free).
+
 ### 2026-07-31 — Postgres FTS parity (OR semantics)
 - The Postgres/`tsvector` path (what production runs) already stemmed via the
   `english` config but used `websearch_to_tsquery`'s implicit AND — dormant for
