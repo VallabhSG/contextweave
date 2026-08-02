@@ -19,6 +19,17 @@ class TestHealth:
             assert key in body
         assert body["status"] == "ok"
 
+    def test_version_reports_runtime_config(self, client):
+        r = client.get("/api/version")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["app"] == "contextweave"
+        assert body["storage_backend"] in ("sqlite", "postgres")
+        # feature flags present + no secret values leaked
+        for key in ("reranking_enabled", "fallback_configured", "reasoning_model"):
+            assert key in body
+        assert "api_key" not in str(body).lower()
+
 
 class TestSecurityHeaders:
     def test_root_has_security_headers(self, client):

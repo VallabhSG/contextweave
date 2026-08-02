@@ -76,6 +76,23 @@ class HealthResponse(BaseModel):
     edges: int = 0
 
 
+class VersionResponse(BaseModel):
+    """Build + runtime configuration — no secrets, safe to expose publicly.
+
+    Lets anyone confirm what is actually deployed and which features are live
+    (health alone can't distinguish builds or verify a config change landed).
+    """
+
+    app: str = "contextweave"
+    version: str = "0.1.0"
+    commit: str = "unknown"
+    storage_backend: str = "sqlite"
+    reranking_enabled: bool = False
+    fallback_configured: bool = False
+    reasoning_model: str = ""
+    embedding_model: str = ""
+
+
 # ── Ingestion Endpoints ────────────────────────────────────
 
 
@@ -391,6 +408,25 @@ def debug_gemini():
 
 
 # ── Health ──────────────────────────────────────────────────
+
+
+@router.get("/version", response_model=VersionResponse)
+def version():
+    """Deployed build + which features are live (no secrets)."""
+    import os
+
+    from contextweave.config import settings as cfg
+
+    return VersionResponse(
+        commit=os.environ.get("CW_COMMIT", "unknown"),
+        storage_backend="postgres" if cfg.database_url else "sqlite",
+        reranking_enabled=bool(cfg.rerank_model),
+        fallback_configured=bool(
+            cfg.fallback_base_url and cfg.fallback_api_key and cfg.fallback_model
+        ),
+        reasoning_model=cfg.reasoning_model,
+        embedding_model=cfg.embedding_model,
+    )
 
 
 @router.get("/health", response_model=HealthResponse)
