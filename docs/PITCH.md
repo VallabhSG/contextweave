@@ -11,8 +11,12 @@
 
 **Verifiable now**
 - Live, deployed demo (Hugging Face Space) + interactive API docs.
-- Retrieval quality is **measured**: eval harness reports hit@5 and MRR;
-  cross-encoder reranking lifts **MRR 0.83 → 1.00** on the eval set.
+- Retrieval quality is **measured**, including on a **public benchmark**:
+  - Internal eval: cross-encoder reranking lifts **MRR 0.83 → 1.00**.
+  - **LoCoMo** (the standard multi-session memory benchmark): retrieval
+    **recall@5 0.56 → 0.64 with reranking** (494 questions; full-set run pending),
+    **strongest on temporal queries (0.77)** — the category incumbents call
+    hardest. Reproducible harness in `benchmarks/`.
 - Architecture: hybrid retrieval (vector + full-text + knowledge graph),
   intent-aware temporal decay, token-budgeted context assembly with
   MMR-dedup + query-aware compression, relevance-calibrated confidence with
@@ -21,8 +25,8 @@
   run **100% offline** (local Ollama LLM) with no data leaving the machine.
   Cloud LLMs (Groq primary, Cerebras failover) optional.
 - Swappable storage: SQLite (local) or Postgres + pgvector (cloud/Supabase).
-- Engineering rigor: **184 automated tests**, real integration tests, LLM
-  provider failover, live deployment with security headers + rate limiting.
+- Engineering rigor: **192 automated tests** (incl. real Postgres integration),
+  LLM provider failover, live deployment with security headers + rate limiting.
 
 **Not true yet (state honestly)**
 - No users, no revenue, no design partners. It is a **working demo**, not a
@@ -63,10 +67,13 @@ category the buyers themselves say lacks comparable metrics. Privacy/edge and
 "which layer is actually more accurate per token" are *named open problems*;
 they're our starting point.
 
-**Proof.** Live demo; measured retrieval (MRR 0.83 → 1.00 with reranking); runs
-fully offline; 184 tests. Built by one engineer — the same hard core (hybrid
-retrieval, intent-aware decay, reranking, budgeted assembly, calibrated
-confidence) that venture-funded teams are building.
+**Proof.** Live demo; measured retrieval — **MRR 0.83 → 1.00** internally and
+**recall@5 0.56 → 0.64 on the public LoCoMo benchmark** with reranking (strongest
+on *temporal*, the hardest category); runs **fully offline**; ships an **MCP
+server** (private agent memory in one config block); 192 tests. Built by one
+engineer — the same hard core (hybrid retrieval, intent-aware decay, reranking,
+budgeted assembly, calibrated confidence) that venture-funded teams are building.
+<!-- test count: 192 (182 unit/integration + 10 Postgres) as of 2026-08-06 -->
 
 **The ask.** Raising a **[PLACEHOLDER ~$650K] pre-seed (SAFE)** to (1) publish
 standard-benchmark numbers (LoCoMo/LongMemEval) vs. incumbents, (2) ship a

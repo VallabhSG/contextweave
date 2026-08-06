@@ -134,11 +134,15 @@ squarely against context rot, with:
 - an explicit roadmap to **public benchmarks (LoCoMo/LongMemEval)** and a
   developer SDK.
 
-Immediate credibility work before outreach (in priority order):
-1. Run **LoCoMo / LongMemEval** and publish the numbers vs. Mem0/Zep.
-2. Ship a thin **developer SDK / MCP endpoint** (the incumbents' actual wedge is
-   3-lines-of-code integration).
-3. Tighten the one-pager/deck around the privacy + measured-quality wedge.
+Immediate credibility work before outreach (progress noted):
+1. ✅ **LoCoMo retrieval-recall** harness + numbers shipped (`benchmarks/`):
+   recall@5 0.56 → 0.64 with reranking; strongest on temporal. **Next:** add
+   LLM-judged answer-accuracy + a head-to-head vs. Mem0/Zep on identical splits;
+   add LongMemEval.
+2. ✅ **MCP server** shipped — private, local-first agent memory (the incumbents'
+   integration wedge, but local). Next: a hosted cloud tier + more integrations.
+3. ✅ One-pager/deck drafted around the privacy + measured-quality wedge
+   (`docs/PITCH.md`). Next: fill founder/raise placeholders; designed one-pager.
 
 ## 6. Sources
 - Chroma, *Context Rot* (2026) — research.trychroma.com/context-rot
