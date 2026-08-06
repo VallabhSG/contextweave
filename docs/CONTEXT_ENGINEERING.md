@@ -133,6 +133,21 @@ test), so de-duplication must live in the assembly layer, never in the retriever
 
 ## Changelog
 
+### 2026-08-02 — MCP server + ops/robustness (fundraising-readiness)
+- **MCP server** (`contextweave/mcp_server.py`): ContextWeave as private,
+  local-first agent memory — `add_memory` / `search_memory` tools over the full
+  retrieval stack, wireable into Claude Desktop / any agent. The developer/agent
+  integration wedge (the funded incumbents' actual moat), but local-first.
+- **`/api/version`**: reports deployed build + live feature flags (backend,
+  reranking, fallback) with no secrets — closes the "health ≠ what's deployed"
+  gap. Verified in production (postgres, reranking on, fallback configured).
+- **Backend-parity guard** (`tests/test_backend_parity.py`): asserts the Postgres
+  storage classes expose the retriever's required interface, so the SQLite/Postgres
+  drift that caused the production 500 fails in CI instead.
+- Added `docs/MARKET_RESEARCH.md` (sourced competitive/market memo) and
+  `docs/PITCH.md` (pre-seed one-pager + narrative). **Top remaining technical
+  credibility item for a raise: publish LoCoMo/LongMemEval numbers vs. incumbents.**
+
 ### 2026-08-01 — Expanded eval + reranked-quality guard
 - Grew the eval set from 6 cases / 10 notes to **12 cases / 18 notes**, more
   diverse and realistic — small enough to maintain, large enough to be a real

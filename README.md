@@ -192,6 +192,36 @@ curl -X POST https://vallllllllll-contextweave.hf.space/api/ingest/audio \
 
 ---
 
+## Use it as agent memory (MCP)
+
+ContextWeave ships an **MCP server** — plug it into Claude Desktop or any agent
+framework and your agent gets **private, local-first long-term memory**. The full
+hybrid-retrieval + reranking stack runs on your machine; nothing leaves the box
+unless you configure a cloud LLM.
+
+```bash
+pip install mcp            # optional dependency for the MCP server
+python -m contextweave.mcp_server
+```
+
+Claude Desktop (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "contextweave": {
+      "command": "python",
+      "args": ["-m", "contextweave.mcp_server"]
+    }
+  }
+}
+```
+
+Two tools are exposed: `add_memory(content)` and `search_memory(query)`. Unlike
+cloud memory SaaS, the store, embeddings, and re-ranker are all local.
+
+---
+
 ## Quickstart
 
 ### Try the live API
