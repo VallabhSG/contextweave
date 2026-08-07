@@ -19,12 +19,12 @@ questions are excluded from recall (they can't be scored) and reported separatel
 
 | Config | recall@5 | recall@10 |
 |---|---:|---:|
-| Fused (vector + FTS + graph) | _(full-set run finalizing)_ | — |
+| Fused (vector + FTS + graph) | 0.520 | 0.622 |
 | **+ cross-encoder reranking** | **0.598** | **0.644** |
 
-_(On a 3-conversation / 494-question subset the fused → reranked lift was
-0.563 → 0.638 at recall@5; the full-set fused number is being computed to give a
-clean before/after — the reranked full-set figure above is final.)_
+Reranking lifts recall@5 by **+7.8 points (0.520 → 0.598, +15% relative)** across
+all 1,977 questions — a public-benchmark confirmation of the reranking win seen
+on the internal eval (MRR 0.83 → 1.00).
 
 ### By LoCoMo category (full set, with reranking)
 | Category | n | recall@5 | recall@10 |
@@ -46,13 +46,34 @@ clean before/after — the reranked full-set figure above is final.)_
 - Adversarial (0.45) is expected to be lower — those questions are designed to
   have no clean supporting turn.
 
+## How to read these numbers (important — they look lower than incumbents' headlines)
+
+`recall@5 ≈ 0.60` is a **strict retrieval lower-bound**, deliberately harder than
+what memory vendors advertise:
+
+- **It's recall, not answer accuracy.** It asks "is the *one exact* gold turn in
+  the top-5, out of ~250 raw dialogue turns?" Mem0/Zep headline **LLM-judged
+  answer accuracy** (e.g. Mem0's ~93% LongMemEval) — a different, higher metric,
+  because the model answers from the *whole* retrieved context, not just the
+  single gold turn. **These numbers are not comparable**; recall under-states
+  end-to-end quality.
+- **We retrieve raw turns; incumbents retrieve extracted facts.** They summarise
+  conversations into fact memories first, which is an easier retrieval target.
+  Raw-turn retrieval is the conservative choice.
+- **The number is real, not a scoring artifact.** A diagnostic (196 questions)
+  found only **1%** "retrieved-but-mis-scored" — the exact-substring match is
+  accurate. The remaining misses are genuine, and LoCoMo (needle in ~250 turns)
+  is legitimately hard.
+
+The honest, comparable metric is **answer accuracy** (retrieve → LLM answers →
+judge); it is being measured and will be reported here as the headline, with
+recall kept as the stricter retrieval-only diagnostic.
+
 ## Caveats
-- Recall, not answer-accuracy. A high-recall system still needs good synthesis;
-  ContextWeave does the synthesis + calibrated confidence on top, not measured here.
-- Sample is 3/10 conversations pending the full run (494 questions is already a
-  meaningful sample).
 - Not yet compared head-to-head with Mem0/Zep on identical settings — the next
   step is to run their published harnesses on the same split.
+- ContextWeave's synthesis + calibrated confidence sit on top of retrieval and
+  are captured by the answer-accuracy metric, not by recall.
 
 ## Reproduce
 ```bash
