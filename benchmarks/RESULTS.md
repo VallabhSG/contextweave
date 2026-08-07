@@ -15,36 +15,36 @@ runs the real embedding + hybrid-retrieval (+ optional cross-encoder rerank)
 stack. `groq_api_key` blanked (retrieval only). Adversarial / no-evidence
 questions are excluded from recall (they can't be scored) and reported separately.
 
-## Results
-
-_Sample below: 3 of 10 conversations, **494 answerable questions**. Full-set
-numbers appended when the 10-conversation run completes._
+## Results — full set (all 10 conversations, **1,977 answerable questions**)
 
 | Config | recall@5 | recall@10 |
 |---|---:|---:|
-| Fused (vector + FTS + graph) | **0.563** | 0.668 |
-| **+ cross-encoder reranking** | **0.638** | 0.694 |
+| Fused (vector + FTS + graph) | _(full-set run finalizing)_ | — |
+| **+ cross-encoder reranking** | **0.598** | **0.644** |
 
-Reranking lifts recall@5 by **+7.5 points (+13% relative)** — a public-benchmark
-confirmation of the reranking win seen on the internal eval (MRR 0.83 → 1.00).
+_(On a 3-conversation / 494-question subset the fused → reranked lift was
+0.563 → 0.638 at recall@5; the full-set fused number is being computed to give a
+clean before/after — the reranked full-set figure above is final.)_
 
-### By LoCoMo category (with reranking)
+### By LoCoMo category (full set, with reranking)
 | Category | n | recall@5 | recall@10 |
 |---|---:|---:|---:|
-| 2 — temporal | 90 | **0.767** | 0.800 |
-| 4 — single-hop | 200 | 0.665 | 0.730 |
-| 1 — multi-hop | 73 | 0.630 | 0.712 |
-| 5 — adversarial | 112 | 0.527 | 0.571 |
-| 3 — open-domain | 19 | 0.421 | 0.474 |
+| 2 — temporal | 320 | **0.688** | 0.731 |
+| 4 — single-hop | 841 | 0.648 | 0.691 |
+| 1 — multi-hop | 281 | 0.641 | 0.690 |
+| 5 — adversarial | 446 | 0.451 | 0.504 |
+| 3 — open-domain | 89 | 0.404 | 0.449 |
 
 **Reading the numbers (honestly):**
-- **Temporal is the strongest category (0.77)** — direct evidence that
+- **Temporal is the strongest category (0.69)** — direct evidence that
   intent-aware temporal decay works; temporal reasoning is the category
   incumbents call hardest.
-- **Reranking's biggest lift is single-hop** (0.535 → 0.665, +13 pts) — pulling
-  the one right turn into the top-5.
-- **Open-domain is weakest** (world-knowledge questions where the evidence turn
-  is only obliquely related) — the clearest improvement target.
+- **Multi-hop and single-hop are solid (~0.64–0.65)** — the fused-signal +
+  graph-expansion stack surfaces supporting turns well.
+- **Open-domain is weakest (0.40)** — world-knowledge questions where the
+  evidence turn is only obliquely related; the clearest improvement target.
+- Adversarial (0.45) is expected to be lower — those questions are designed to
+  have no clean supporting turn.
 
 ## Caveats
 - Recall, not answer-accuracy. A high-recall system still needs good synthesis;

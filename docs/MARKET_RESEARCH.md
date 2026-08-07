@@ -136,7 +136,8 @@ squarely against context rot, with:
 
 Immediate credibility work before outreach (progress noted):
 1. ✅ **LoCoMo retrieval-recall** harness + numbers shipped (`benchmarks/`):
-   recall@5 0.56 → 0.64 with reranking; strongest on temporal. **Next:** add
+   recall@5 = 0.60 on all 1,977 questions with reranking; strongest on temporal
+   (0.69). **Next:** add
    LLM-judged answer-accuracy + a head-to-head vs. Mem0/Zep on identical splits;
    add LongMemEval.
 2. ✅ **MCP server** shipped — private, local-first agent memory (the incumbents'

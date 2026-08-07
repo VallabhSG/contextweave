@@ -13,10 +13,11 @@
 - Live, deployed demo (Hugging Face Space) + interactive API docs.
 - Retrieval quality is **measured**, including on a **public benchmark**:
   - Internal eval: cross-encoder reranking lifts **MRR 0.83 → 1.00**.
-  - **LoCoMo** (the standard multi-session memory benchmark): retrieval
-    **recall@5 0.56 → 0.64 with reranking** (494 questions; full-set run pending),
-    **strongest on temporal queries (0.77)** — the category incumbents call
-    hardest. Reproducible harness in `benchmarks/`.
+  - **LoCoMo** (the standard multi-session memory benchmark, all **1,977
+    questions**): retrieval **recall@5 = 0.60 with reranking**, **strongest on
+    temporal (0.69)** — the category incumbents call hardest. (Reranking's lift
+    measured at +7.5 pts recall@5 on a subset; full-set before/after finalizing.)
+    Reproducible harness in `benchmarks/`.
 - Architecture: hybrid retrieval (vector + full-text + knowledge graph),
   intent-aware temporal decay, token-budgeted context assembly with
   MMR-dedup + query-aware compression, relevance-calibrated confidence with
@@ -68,8 +69,9 @@ category the buyers themselves say lacks comparable metrics. Privacy/edge and
 they're our starting point.
 
 **Proof.** Live demo; measured retrieval — **MRR 0.83 → 1.00** internally and
-**recall@5 0.56 → 0.64 on the public LoCoMo benchmark** with reranking (strongest
-on *temporal*, the hardest category); runs **fully offline**; ships an **MCP
+**recall@5 = 0.60 on the public LoCoMo benchmark** (all 1,977 questions, with
+reranking; strongest on *temporal*, the hardest category); runs **fully offline**;
+ships an **MCP
 server** (private agent memory in one config block); 192 tests. Built by one
 engineer — the same hard core (hybrid retrieval, intent-aware decay, reranking,
 budgeted assembly, calibrated confidence) that venture-funded teams are building.
