@@ -66,8 +66,20 @@ what memory vendors advertise:
   is legitimately hard.
 
 The honest, comparable metric is **answer accuracy** (retrieve → LLM answers →
-judge); it is being measured and will be reported here as the headline, with
-recall kept as the stricter retrieval-only diagnostic.
+judge). A quick harness attempt returned a misleadingly low ~0.16 — and a
+spot-check showed **that number is a harness artifact, not system quality**:
+- **Temporal questions failed on date resolution** — the ingest used `utcnow()`
+  instead of each session's real timestamp, so the model saw "yesterday" with no
+  way to resolve it to "7 May 2023". LoCoMo requires the session dates.
+- **The self-judge was too strict** — it marked correct answers wrong
+  ("trans" vs "Transgender woman"; "counseling and mental health" vs
+  "psychology, counseling certification").
+
+So a trustworthy answer-accuracy number needs a proper harness: real session
+timestamps on each memory, a strong generator, and the **official LoCoMo eval
+methodology / a validated judge**. That is the top remaining benchmark task —
+recall@k (above) is the reliable measurement until it lands, and it is a
+conservative lower bound, not an indictment of end-to-end quality.
 
 ## Caveats
 - Not yet compared head-to-head with Mem0/Zep on identical settings — the next

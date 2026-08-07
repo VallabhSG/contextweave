@@ -13,11 +13,13 @@
 - Live, deployed demo (Hugging Face Space) + interactive API docs.
 - Retrieval quality is **measured**, including on a **public benchmark**:
   - Internal eval: cross-encoder reranking lifts **MRR 0.83 → 1.00**.
-  - **LoCoMo** (the standard multi-session memory benchmark, all **1,977
-    questions**): retrieval **recall@5 = 0.60 with reranking**, **strongest on
-    temporal (0.69)** — the category incumbents call hardest. (Reranking's lift
-    measured at +7.5 pts recall@5 on a subset; full-set before/after finalizing.)
-    Reproducible harness in `benchmarks/`.
+  - **LoCoMo** (standard multi-session memory benchmark, all **1,977 questions**),
+    reproducible harness in `benchmarks/`: reranking measurably lifts retrieval
+    **recall@5 0.52 → 0.60 (+15%)**, and **temporal — the category incumbents call
+    hardest — is our strongest (0.69)**, validating intent-aware decay. _(This is
+    strict retrieval recall — a conservative lower bound, not the LLM-judged
+    answer accuracy vendors headline; a rigorous answer-accuracy comparison is the
+    next benchmark milestone.)_
 - Architecture: hybrid retrieval (vector + full-text + knowledge graph),
   intent-aware temporal decay, token-budgeted context assembly with
   MMR-dedup + query-aware compression, relevance-calibrated confidence with
@@ -69,9 +71,9 @@ category the buyers themselves say lacks comparable metrics. Privacy/edge and
 they're our starting point.
 
 **Proof.** Live demo; measured retrieval — **MRR 0.83 → 1.00** internally and
-**recall@5 = 0.60 on the public LoCoMo benchmark** (all 1,977 questions, with
-reranking; strongest on *temporal*, the hardest category); runs **fully offline**;
-ships an **MCP
+on the public **LoCoMo** benchmark, reranking lifts retrieval **recall@5 0.52 →
+0.60** (all 1,977 questions), strongest on *temporal* — the hardest category;
+runs **fully offline**; ships an **MCP
 server** (private agent memory in one config block); 192 tests. Built by one
 engineer — the same hard core (hybrid retrieval, intent-aware decay, reranking,
 budgeted assembly, calibrated confidence) that venture-funded teams are building.
