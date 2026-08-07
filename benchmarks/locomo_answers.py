@@ -131,11 +131,9 @@ def run(data_path: str, limit: int | None, max_questions: int | None) -> None:
     if limit:
         samples = samples[:limit]
 
-    base = (
-        f"/tmp/locomo_ans_{uuid4().hex[:8]}"
-        if os.name != "nt"
-        else os.path.join(os.environ.get("TEMP", "."), f"la_{uuid4().hex[:8]}")
-    )
+    import tempfile
+
+    base = tempfile.mkdtemp(prefix="locomo_ans_")
     settings.sqlite_db_path = base + "/d.db"
     settings.chroma_persist_dir = base + "/c"
     settings.data_dir = base + "/data"
