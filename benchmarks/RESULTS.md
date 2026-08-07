@@ -75,11 +75,17 @@ spot-check showed **that number is a harness artifact, not system quality**:
   ("trans" vs "Transgender woman"; "counseling and mental health" vs
   "psychology, counseling certification").
 
-So a trustworthy answer-accuracy number needs a proper harness: real session
-timestamps on each memory, a strong generator, and the **official LoCoMo eval
-methodology / a validated judge**. That is the top remaining benchmark task —
-recall@k (above) is the reliable measurement until it lands, and it is a
-conservative lower bound, not an indictment of end-to-end quality.
+After fixing both bugs (real per-session dates on each memory + a
+semantic-equivalence judge), an indicative re-run scored **17/25 = 0.68 answer
+accuracy** — 4× the broken figure and **above** the strict recall (0.60),
+confirming that retrieval recall was *understating* end-to-end quality.
+
+**Indicative, not final:** n=25, one conversation, a free generator/judge
+(`gemma-4-31b`) — the judge is lenient and not independent. A trustworthy headline
+needs the **official LoCoMo eval methodology / a validated judge** over the full
+set with a strong generator. That is the top remaining benchmark task. Until then:
+- **recall@5 0.52 → 0.60 (reranked)** is the reliable, conservative retrieval number.
+- **answer accuracy ≈ 0.68 (indicative)** is the fair end-to-end direction.
 
 ## Caveats
 - Not yet compared head-to-head with Mem0/Zep on identical settings — the next

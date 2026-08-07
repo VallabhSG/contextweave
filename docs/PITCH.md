@@ -16,10 +16,11 @@
   - **LoCoMo** (standard multi-session memory benchmark, all **1,977 questions**),
     reproducible harness in `benchmarks/`: reranking measurably lifts retrieval
     **recall@5 0.52 → 0.60 (+15%)**, and **temporal — the category incumbents call
-    hardest — is our strongest (0.69)**, validating intent-aware decay. _(This is
-    strict retrieval recall — a conservative lower bound, not the LLM-judged
-    answer accuracy vendors headline; a rigorous answer-accuracy comparison is the
-    next benchmark milestone.)_
+    hardest — is our strongest (0.69)**, validating intent-aware decay. Recall is
+    a strict lower bound; on the comparable metric (LLM-judged answer accuracy)
+    an early corrected run scores **≈ 0.68 (indicative, n=25)** — above the recall,
+    as expected. _(A rigorous full-set answer-accuracy run with a validated judge
+    is the next benchmark milestone.)_
 - Architecture: hybrid retrieval (vector + full-text + knowledge graph),
   intent-aware temporal decay, token-budgeted context assembly with
   MMR-dedup + query-aware compression, relevance-calibrated confidence with
