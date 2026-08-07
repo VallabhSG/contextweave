@@ -1,0 +1,171 @@
+<title>ContextWeave — pre-seed one-pager</title>
+<style>
+  :root{
+    --paper:#f3f4f6; --ink:#15171e; --ink-2:#3b3f4a; --muted:#6b7180;
+    --line:#d9dbe0; --card:#fbfbfc; --accent:#0e8f86; --accent-ink:#0b6b64;
+    --good:#1f8a54; --warn:#b06a12;
+    --mono:ui-monospace,"SF Mono","Cascadia Code","Roboto Mono",monospace;
+    --sans:-apple-system,system-ui,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0f1116;--ink:#e9e8e4;--ink-2:#b9bcc6;--muted:#878c99;
+      --line:#262a33;--card:#161922;--accent:#2fd6c4;--accent-ink:#7ff0e4;--good:#4cc98a;--warn:#e0a24a;}
+  }
+  :root[data-theme="light"]{--paper:#f3f4f6;--ink:#15171e;--ink-2:#3b3f4a;--muted:#6b7180;
+    --line:#d9dbe0;--card:#fbfbfc;--accent:#0e8f86;--accent-ink:#0b6b64;--good:#1f8a54;--warn:#b06a12;}
+  :root[data-theme="dark"]{--paper:#0f1116;--ink:#e9e8e4;--ink-2:#b9bcc6;--muted:#878c99;
+    --line:#262a33;--card:#161922;--accent:#2fd6c4;--accent-ink:#7ff0e4;--good:#4cc98a;--warn:#e0a24a;}
+
+  *{box-sizing:border-box}
+  body{margin:0}
+  .wrap{background:var(--paper);color:var(--ink);font-family:var(--sans);
+    line-height:1.55;-webkit-font-smoothing:antialiased}
+  .page{max-width:860px;margin:0 auto;padding:clamp(28px,5vw,64px) clamp(20px,5vw,56px)}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent-ink);display:flex;gap:10px;align-items:center}
+  .eyebrow::before{content:"";width:22px;height:2px;background:var(--accent)}
+  h1{font-size:clamp(30px,5.2vw,50px);line-height:1.05;letter-spacing:-.02em;font-weight:800;
+    text-wrap:balance;margin:.5em 0 .3em}
+  h1 .hl{color:var(--accent-ink)}
+  .lede{font-size:clamp(17px,2.2vw,20px);color:var(--ink-2);max-width:62ch;margin:0}
+  .rule{height:1px;background:var(--line);border:0;margin:clamp(24px,4vw,38px) 0}
+  h2{font-family:var(--mono);font-size:12.5px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 14px;font-weight:600}
+  p{margin:0 0 12px;max-width:66ch}
+  a{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid var(--line)}
+
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .metric{background:var(--card);padding:16px 16px 14px}
+  .metric .n{font-family:var(--mono);font-size:clamp(19px,3vw,26px);font-weight:600;
+    font-variant-numeric:tabular-nums;letter-spacing:-.01em;color:var(--ink)}
+  .metric .n b{color:var(--accent-ink);font-weight:700}
+  .metric .k{font-size:12px;color:var(--muted);margin-top:4px}
+  @media (max-width:640px){.metrics{grid-template-columns:repeat(2,1fr)}}
+
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:clamp(20px,4vw,40px)}
+  @media (max-width:640px){.cols{grid-template-columns:1fr}}
+
+  table{width:100%;border-collapse:collapse;font-size:14.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  td.us{color:var(--ink);font-weight:600}
+  .chip{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:999px;
+    border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+  .chip.on{color:var(--accent-ink);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+
+  ul.tight{margin:0;padding-left:18px}
+  ul.tight li{margin:0 0 7px}
+  .note{font-size:13px;color:var(--muted);border-left:2px solid var(--line);padding:2px 0 2px 14px}
+  .ask{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:clamp(18px,3vw,26px)}
+  .ph{font-family:var(--mono);font-size:12px;color:var(--warn)}
+  .foot{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13.5px;color:var(--ink-2);margin-top:8px}
+  .foot .lbl{color:var(--muted)}
+</style>
+
+<div class="wrap"><div class="page">
+
+  <div class="eyebrow">Pre-seed &nbsp;·&nbsp; Memory &amp; context infrastructure</div>
+  <h1>Your context, retrieved and ranked to fit the model's window — <span class="hl">on your own infrastructure.</span></h1>
+  <p class="lede">ContextWeave is a privacy-first, self-hostable memory &amp; context-engineering
+  layer for AI — the antidote to <em>context rot</em>. It selects, ranks, and budgets what
+  reaches the model instead of dumping history into an ever-larger window.</p>
+
+  <hr class="rule">
+
+  <div class="metrics">
+    <div class="metric"><div class="n">0.83&nbsp;→&nbsp;<b>1.00</b></div><div class="k">Internal eval MRR (with reranking)</div></div>
+    <div class="metric"><div class="n">0.52&nbsp;→&nbsp;<b>0.60</b></div><div class="k">LoCoMo recall@5 (reranked)</div></div>
+    <div class="metric"><div class="n"><b>100%</b> local</div><div class="k">Runs fully offline — no data leaves the box</div></div>
+    <div class="metric"><div class="n"><b>192</b></div><div class="k">Automated tests · live deployment</div></div>
+  </div>
+
+  <hr class="rule">
+
+  <div class="cols">
+    <div>
+      <h2>Why now</h2>
+      <p>Bigger context windows don't fix memory — they make it worse. Chroma (2026)
+      found <strong>all 18 frontier models degrade as input grows</strong>; the
+      lost-in-the-middle effect drops accuracy ~70% → ~55% once ~20 documents fill the
+      window. Coatue calls memory <em>"the new bottleneck"</em>; NVIDIA ships a tiered
+      agent-memory stack; clouds now meter memory.</p>
+      <p class="note">Market ≈ $6B (2025) → $28B (2030), ~35% CAGR (Mordor; estimates
+      vary — see market memo). Agentic AI ~$52B by 2030.</p>
+    </div>
+    <div>
+      <h2>What we built</h2>
+      <ul class="tight">
+        <li><strong>Hybrid retrieval</strong> — vector + full-text + knowledge graph, fused.</li>
+        <li><strong>Intent-aware temporal decay</strong> — temporal queries see their history.</li>
+        <li><strong>Cross-encoder reranking</strong> — measured recall/MRR lift.</li>
+        <li><strong>Token-budgeted assembly</strong> — MMR-dedup + query-aware compression.</li>
+        <li><strong>Honest confidence</strong> — calibrated, hedges on weak context.</li>
+        <li><strong>MCP server</strong> — private agent memory in one config block.</li>
+      </ul>
+    </div>
+  </div>
+
+  <hr class="rule">
+
+  <h2>The wedge — why us, not the funded incumbents</h2>
+  <table>
+    <tr><th>&nbsp;</th><th>Mem0 · Zep · Letta</th><th>ContextWeave</th></tr>
+    <tr>
+      <td class="us">Deployment</td>
+      <td><span class="chip">Cloud SaaS</span></td>
+      <td><span class="chip on">Local-first · self-hostable</span></td>
+    </tr>
+    <tr>
+      <td class="us">Quality claims</td>
+      <td>Vendor-reported</td>
+      <td><span class="chip on">Reproducible public benchmark</span></td>
+    </tr>
+    <tr>
+      <td class="us">Their open problems</td>
+      <td>temporal · abstention · staleness · privacy</td>
+      <td class="us">already addressed (decay · calibrated confidence · on-box)</td>
+    </tr>
+  </table>
+  <p class="note" style="margin-top:14px">Consumer personal-memory is a different, harder lane —
+  consolidating into Big Tech (Limitless/Rewind → acquired by Meta) and well-funded (Thine
+  $9.36M). We don't fight there head-on.</p>
+
+  <hr class="rule">
+
+  <div class="cols">
+    <div>
+      <h2>Proof</h2>
+      <ul class="tight">
+        <li>Live, deployed demo + interactive API docs.</li>
+        <li>Measured retrieval — internal MRR 0.83 → 1.00; public <strong>LoCoMo</strong>
+        recall@5 0.52 → 0.60 with reranking, strongest on <em>temporal</em> (the hardest
+        category). Reproducible harness.</li>
+        <li>Runs fully offline (local LLM) — verified end-to-end.</li>
+        <li>Built by one engineer — the same hard core funded teams are building.</li>
+      </ul>
+      <p class="note" style="margin-top:12px">Honest stage: pre-traction. A working, measured
+      demo — the raise is to earn the first adoption metrics. Recall is a conservative
+      retrieval lower bound; a validated full answer-accuracy benchmark is the next milestone.</p>
+    </div>
+    <div class="ask">
+      <h2>The ask</h2>
+      <p style="margin-bottom:10px"><span class="ph">[default — set your target]</span><br>
+      <strong style="font-size:19px">$650K</strong> pre-seed (SAFE) · ~18 months runway</p>
+      <table>
+        <tr><td class="us">Benchmarks + SDK</td><td>publish LoCoMo answer-accuracy vs. incumbents; ship the 3-line SDK/MCP</td></tr>
+        <tr><td class="us">Design partners</td><td>10 privacy-sensitive teams / self-hosters</td></tr>
+        <tr><td class="us">First pilots</td><td>seed-ready usage + retention</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <hr class="rule">
+  <div class="foot">
+    <span><span class="lbl">Founder</span> <span class="ph">[your name · one-line bio]</span></span>
+    <span><span class="lbl">Contact</span> <span class="ph">[email]</span></span>
+    <span><span class="lbl">Demo</span> vallllllllll-contextweave.hf.space</span>
+    <span><span class="lbl">Code</span> github.com/VallabhSG/contextweave</span>
+  </div>
+
+</div></div>
