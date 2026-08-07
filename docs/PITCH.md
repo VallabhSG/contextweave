@@ -36,9 +36,15 @@
 - No users, no revenue, no design partners. It is a **working demo**, not a
   company with traction. The raise is to earn the first metrics.
 
-**[PLACEHOLDER — confirm with founder]**
-- Founder name/bio; company entity; exact raise size & instrument; any advisors.
-- Proposed raise below is a *suggestion*, not a fixed number.
+**To finalize — the only inputs I can't produce (≈2 minutes)**
+1. **Founder name + one-line bio** (background that makes "this person can build the
+   hard part" credible — e.g. prior work, education, shipped projects).
+2. **Raise size + instrument** — a **$650K SAFE** default is used below; change it
+   to your real target.
+3. **Contact email.** (Demo URL and repo are already filled — they're verifiable.)
+
+_Verifiable, already filled:_ Demo `vallllllllll-contextweave.hf.space` · Code
+`github.com/VallabhSG/contextweave`.
 
 ---
 
@@ -85,7 +91,8 @@ standard-benchmark numbers (LoCoMo/LongMemEval) vs. incumbents, (2) ship a
 3-lines-of-code **SDK/MCP** integration, and (3) land the first **10 design
 partners** in privacy-sensitive teams.
 
-**Contact.** [PLACEHOLDER — founder name, email, demo URL, GitHub.]
+**Contact.** [Your name] · [email] · **Demo:** vallllllllll-contextweave.hf.space ·
+**Code:** github.com/VallabhSG/contextweave
 
 ---
 
